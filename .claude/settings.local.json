@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew build --stacktrace)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew build)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew clean build --refresh-dependencies)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && jar -tf build/libs/voicecastaddon-0.0.1.jar | grep -E \"\\(vosk|jna\\)\" | head -20)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew dependencies --configuration runtimeClasspath | grep -A 5 vosk)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew prepareRuns)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew createMinecraftArtifacts)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew --refresh-dependencies)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew runClient 2>&1 | head -50)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew dependencies --configuration runtimeClasspath 2>&1 | grep -E \"\\(vosk|jna\\)\" | head -10)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew build --refresh-dependencies)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew clean build)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && timeout 30 ./gradlew runClient 2>&1 | head -100)",
+      "Bash(cp -r \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\\\\run\\\\client\\\\voice-models\\\\vosk-model-small-en-us-0.15\" \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\\\\src\\\\main\\\\resources\\\\assets\\\\voicecastaddon\\\\voice-models\\\\\")",
+      "Bash(cp -r \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\\\\run\\\\client\\\\voice-models\\\\vosk-model-small-en-us-0.15\" \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\\\\src\\\\main\\\\resources\\\\assets\\\\voicecastaddon\\\\voice-models/\")",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && timeout 60 ./gradlew runClient 2>&1 | grep -E \"\\(VoiceCastAddon|ERROR|FATAL\\)\" | head -20)",
+      "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew dependencies --configuration runtimeClasspath 2>&1 | grep -E \"vosk|jna\" | grep -v \">\" | head -5)"
+    ]
+  }
+}
