@@ -1,5 +1,7 @@
 package com.yelle233.voicecastaddon.client;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import org.vosk.Model;
@@ -16,18 +18,29 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.stream.Stream;
 
 public class VoiceRecognitionManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float SAMPLE_RATE = 16000.0f;
     private static final Object MODEL_LOCK = new Object();
+    private static final String ENGLISH_MODEL_DIR = "vosk-model-small-en-us-0.15";
+    private static final String CHINESE_MODEL_DIR = "vosk-model-small-cn-0.22";
 
     private static TargetDataLine line;
     private static ByteArrayOutputStream audioBuffer;
@@ -36,7 +49,7 @@ public class VoiceRecognitionManager {
     private static volatile String lastError = "";
     private static volatile boolean warmUpStarted = false;
 
-    private static Model model;
+    private static final Map<String, Model> MODELS = new LinkedHashMap<>();
 
     public static boolean startListening() {
         if (listening) {
@@ -44,7 +57,7 @@ public class VoiceRecognitionManager {
         }
 
         try {
-            initModelIfNeeded();
+            initModelsIfNeeded();
 
             AudioFormat format = new AudioFormat(SAMPLE_RATE, 16, 1, true, false);
             DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
@@ -80,9 +93,9 @@ public class VoiceRecognitionManager {
         }
     }
 
-    public static String stopListeningAndRecognize() {
+    public static List<String> stopListeningAndRecognizeCandidates() {
         if (!listening) {
-            return "";
+            return List.of();
         }
 
         listening = false;
@@ -98,19 +111,33 @@ public class VoiceRecognitionManager {
 
         byte[] audioBytes = audioBuffer != null ? audioBuffer.toByteArray() : new byte[0];
         if (audioBytes.length == 0) {
-            return "";
+            return List.of();
         }
 
-        try (Recognizer recognizer = new Recognizer(model, SAMPLE_RATE)) {
-            recognizer.acceptWaveForm(audioBytes, audioBytes.length);
-            String json = recognizer.getFinalResult();
-            LOGGER.info("[VoiceCastAddon] Vosk result json = {}", json);
-            return extractText(json);
-        } catch (Throwable t) {
-            lastError = describeThrowable(t);
-            LOGGER.error("[VoiceCastAddon] Failed to recognize recorded audio: {}", lastError, t);
-            return "";
+        List<ModelResult> results = MODELS.entrySet().stream()
+                .map(entry -> CompletableFuture.supplyAsync(() ->
+                        new ModelResult(entry.getKey(), recognizeWithModel(entry.getKey(), entry.getValue(), audioBytes))))
+                .toList()
+                .stream()
+                .map(future -> {
+                    try {
+                        return future.join();
+                    } catch (CompletionException e) {
+                        LOGGER.error("[VoiceCastAddon] Model recognition task failed", e);
+                        return null;
+                    }
+                })
+                .filter(result -> result != null && result.text != null && !result.text.isBlank())
+                .sorted(Comparator.comparingInt(ModelResult::priority))
+                .toList();
+
+        List<String> candidates = new ArrayList<>();
+        for (ModelResult result : results) {
+            if (!candidates.contains(result.text)) {
+                candidates.add(result.text);
+            }
         }
+        return candidates;
     }
 
     public static boolean isListening() {
@@ -135,7 +162,7 @@ public class VoiceRecognitionManager {
 
         Thread warmUpThread = new Thread(() -> {
             try {
-                initModelIfNeeded();
+                initModelsIfNeeded();
             } catch (Throwable t) {
                 lastError = describeThrowable(t);
                 LOGGER.error("[VoiceCastAddon] Failed to warm up voice recognition: {}", lastError, t);
@@ -145,39 +172,49 @@ public class VoiceRecognitionManager {
         warmUpThread.start();
     }
 
-    private static void initModelIfNeeded() {
-        if (model != null) {
+    private static void initModelsIfNeeded() {
+        if (!MODELS.isEmpty()) {
             return;
         }
 
         synchronized (MODEL_LOCK) {
-            if (model != null) {
+            if (!MODELS.isEmpty()) {
                 return;
             }
 
-            try {
-                File modelDir = tryLoadFromExternalPath();
-                if (modelDir == null) {
-                    modelDir = extractModelFromJar();
-                }
+            loadModel("en_us", ENGLISH_MODEL_DIR, true);
+            loadModel("zh_cn", CHINESE_MODEL_DIR, false);
 
-                if (modelDir == null) {
-                    throw new IllegalStateException("Could not find a Vosk model directory");
-                }
-
-                model = new Model(modelDir.getAbsolutePath());
-                LOGGER.info("[VoiceCastAddon] Vosk model loaded from {}", modelDir.getAbsolutePath());
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to load Vosk model files", e);
+            if (MODELS.isEmpty()) {
+                throw new IllegalStateException("Could not find any Vosk model directory");
             }
         }
     }
 
-    private static File tryLoadFromExternalPath() {
+    private static void loadModel(String key, String modelDirectoryName, boolean allowJarFallback) {
+        try {
+            File modelDir = tryLoadModelFromExternalPath(modelDirectoryName);
+            if (modelDir == null && allowJarFallback) {
+                modelDir = extractModelFromJar(modelDirectoryName);
+            }
+
+            if (modelDir == null) {
+                LOGGER.info("[VoiceCastAddon] Model {} not found, skipping", modelDirectoryName);
+                return;
+            }
+
+            MODELS.put(key, new Model(modelDir.getAbsolutePath()));
+            LOGGER.info("[VoiceCastAddon] Vosk model {} loaded from {}", key, modelDir.getAbsolutePath());
+        } catch (Throwable t) {
+            LOGGER.error("[VoiceCastAddon] Failed to load model {}: {}", modelDirectoryName, describeThrowable(t), t);
+        }
+    }
+
+    private static File tryLoadModelFromExternalPath(String modelDirectoryName) {
         String[] possiblePaths = {
-                "client/voice-models/vosk-model-small-en-us-0.15",
-                "voice-models/vosk-model-small-en-us-0.15",
-                "run/client/voice-models/vosk-model-small-en-us-0.15"
+                "client/voice-models/" + modelDirectoryName,
+                "voice-models/" + modelDirectoryName,
+                "run/client/voice-models/" + modelDirectoryName
         };
 
         for (String path : possiblePaths) {
@@ -190,20 +227,34 @@ public class VoiceRecognitionManager {
         return null;
     }
 
-    private static File extractModelFromJar() {
+    private static File extractModelFromJar(String modelDirectoryName) {
         try {
             Path tempDir = Files.createTempDirectory("voicecastaddon-vosk-model");
             File modelDir = tempDir.toFile();
             modelDir.deleteOnExit();
 
-            String resourcePath = "/assets/voicecastaddon/voice-models/vosk-model-small-en-us-0.15";
+            String resourcePath = "/assets/voicecastaddon/voice-models/" + modelDirectoryName;
             copyResourceDirectory(resourcePath, modelDir.toPath());
 
             LOGGER.info("[VoiceCastAddon] Extracted model from jar to {}", modelDir.getAbsolutePath());
             return modelDir;
         } catch (IOException e) {
-            LOGGER.error("[VoiceCastAddon] Failed to extract model from jar", e);
+            LOGGER.error("[VoiceCastAddon] Failed to extract model {} from jar", modelDirectoryName, e);
             return null;
+        }
+    }
+
+    private static String recognizeWithModel(String modelKey, Model model, byte[] audioBytes) {
+        try (Recognizer recognizer = new Recognizer(model, SAMPLE_RATE)) {
+            recognizer.acceptWaveForm(audioBytes, audioBytes.length);
+            String json = recognizer.getFinalResult();
+            String text = repairMojibake(extractText(json));
+            LOGGER.info("[VoiceCastAddon] Vosk result ({}) = {}", modelKey, json);
+            return text;
+        } catch (Throwable t) {
+            lastError = describeThrowable(t);
+            LOGGER.error("[VoiceCastAddon] Failed to recognize recorded audio with {}: {}", modelKey, lastError, t);
+            return "";
         }
     }
 
@@ -317,28 +368,59 @@ public class VoiceRecognitionManager {
     }
 
     private static String extractText(String json) {
-        String marker = "\"text\"";
-        int markerIndex = json.indexOf(marker);
-        if (markerIndex < 0) {
+        if (json == null || json.isBlank()) {
             return "";
         }
 
-        int colon = json.indexOf(':', markerIndex);
-        if (colon < 0) {
+        try {
+            JsonObject object = JsonParser.parseString(json).getAsJsonObject();
+            if (!object.has("text")) {
+                return "";
+            }
+            return VoiceSpellAliases.normalize(object.get("text").getAsString());
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to parse recognition json: {}", json, e);
+            return "";
+        }
+    }
+
+    private static String repairMojibake(String text) {
+        if (text == null || text.isBlank()) {
             return "";
         }
 
-        int firstQuote = json.indexOf('"', colon + 1);
-        if (firstQuote < 0) {
-            return "";
+        String normalized = VoiceSpellAliases.normalize(text);
+        if (VoiceSpellAliases.match(normalized) != null) {
+            return normalized;
         }
 
-        int secondQuote = json.indexOf('"', firstQuote + 1);
-        if (secondQuote < 0) {
-            return "";
+        String repaired = tryReencode(normalized, Charset.forName("GBK"), StandardCharsets.UTF_8);
+        if (!repaired.equals(normalized) && VoiceSpellAliases.match(repaired) != null) {
+            LOGGER.info("[VoiceCastAddon] Repaired mojibake text from '{}' to '{}'", normalized, repaired);
+            return repaired;
         }
 
-        return json.substring(firstQuote + 1, secondQuote).trim();
+        repaired = tryReencode(normalized, StandardCharsets.ISO_8859_1, StandardCharsets.UTF_8);
+        if (!repaired.equals(normalized) && VoiceSpellAliases.match(repaired) != null) {
+            LOGGER.info("[VoiceCastAddon] Repaired mojibake text from '{}' to '{}'", normalized, repaired);
+            return repaired;
+        }
+
+        return normalized;
+    }
+
+    private static String tryReencode(String text, Charset wrongCharset, Charset targetCharset) {
+        try {
+            return VoiceSpellAliases.normalize(new String(text.getBytes(wrongCharset), targetCharset));
+        } catch (Exception ignored) {
+            return text;
+        }
+    }
+
+    private record ModelResult(String modelKey, String text) {
+        private int priority() {
+            return "zh_cn".equals(modelKey) ? 0 : 1;
+        }
     }
 
     private VoiceRecognitionManager() {

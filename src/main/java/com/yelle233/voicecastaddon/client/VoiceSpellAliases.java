@@ -10,23 +10,20 @@ public class VoiceSpellAliases {
     private static final Map<String, ResourceLocation> ALIASES = new HashMap<>();
 
     static {
-        // fireball
         add("fireball", "irons_spellbooks:fireball");
         add("fire ball", "irons_spellbooks:fireball");
-        add("火球", "irons_spellbooks:fireball");
-        add("火球术", "irons_spellbooks:fireball");
+        add("\u706b\u7403", "irons_spellbooks:fireball");
+        add("\u706b\u7403\u672f", "irons_spellbooks:fireball");
 
-        // heal
         add("heal", "irons_spellbooks:heal");
         add("healing", "irons_spellbooks:heal");
-        add("治疗", "irons_spellbooks:heal");
-        add("治疗术", "irons_spellbooks:heal");
+        add("\u6cbb\u7597", "irons_spellbooks:heal");
+        add("\u6cbb\u7597\u672f", "irons_spellbooks:heal");
 
-        // lightning lance
         add("lightning", "irons_spellbooks:lightning_lance");
         add("lightning lance", "irons_spellbooks:lightning_lance");
-        add("闪电", "irons_spellbooks:lightning_lance");
-        add("雷枪", "irons_spellbooks:lightning_lance");
+        add("\u95ea\u7535", "irons_spellbooks:lightning_lance");
+        add("\u96f7\u67aa", "irons_spellbooks:lightning_lance");
     }
 
     private static void add(String alias, String spellId) {
@@ -34,19 +31,21 @@ public class VoiceSpellAliases {
     }
 
     public static ResourceLocation match(String rawText) {
-        if (rawText == null) return null;
+        if (rawText == null) {
+            return null;
+        }
         return ALIASES.get(normalize(rawText));
     }
 
-    private static String normalize(String s) {
+    public static String normalize(String s) {
         return s.toLowerCase(Locale.ROOT)
-                .replace("，", " ")
+                .replace("\uFF0C", " ")
                 .replace(",", " ")
-                .replace("。", " ")
+                .replace("\u3002", " ")
                 .replace(".", " ")
-                .replace("！", " ")
+                .replace("\uFF01", " ")
                 .replace("!", " ")
-                .replace("？", " ")
+                .replace("\uFF1F", " ")
                 .replace("?", " ")
                 .trim()
                 .replaceAll("\\s+", " ");

@@ -18,6 +18,7 @@ public class VoiceCastAddonClient {
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
+        System.setProperty("jna.encoding", "UTF-8");
         event.enqueueWork(VoiceRecognitionManager::warmUpAsync);
     }
 }
