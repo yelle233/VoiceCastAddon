@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
@@ -13,6 +14,7 @@ import java.util.List;
 
 public final class VoiceAudioDeviceManager {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final AudioFormat VOICE_FORMAT = new AudioFormat(16000.0f, 16, 1, true, false);
     private static final AudioInputDevice DEFAULT_DEVICE =
             new AudioInputDevice("", "\u7cfb\u7edf\u9ed8\u8ba4\u8f93\u5165\u8bbe\u5907");
 
@@ -25,7 +27,7 @@ public final class VoiceAudioDeviceManager {
 
         for (Mixer.Info info : AudioSystem.getMixerInfo()) {
             Mixer mixer = AudioSystem.getMixer(info);
-            if (!supportsTargetLine(mixer)) {
+            if (!supportsVoiceFormat(mixer)) {
                 continue;
             }
 
@@ -50,7 +52,7 @@ public final class VoiceAudioDeviceManager {
             }
 
             Mixer mixer = AudioSystem.getMixer(info);
-            if (supportsTargetLine(mixer)) {
+            if (supportsVoiceFormat(mixer)) {
                 return mixer;
             }
         }
@@ -59,10 +61,10 @@ public final class VoiceAudioDeviceManager {
         return null;
     }
 
-    private static boolean supportsTargetLine(Mixer mixer) {
+    public static boolean supportsVoiceFormat(Mixer mixer) {
         try {
-            DataLine.Info lineInfo = new DataLine.Info(TargetDataLine.class, null);
-            return mixer.isLineSupported(lineInfo) || mixer.getTargetLineInfo().length > 0;
+            DataLine.Info lineInfo = new DataLine.Info(TargetDataLine.class, VOICE_FORMAT);
+            return mixer.isLineSupported(lineInfo);
         } catch (Exception e) {
             return false;
         }

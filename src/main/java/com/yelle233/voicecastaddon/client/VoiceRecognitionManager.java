@@ -10,6 +10,7 @@ import org.vosk.Recognizer;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
+import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
 import java.io.ByteArrayOutputStream;
@@ -64,10 +65,7 @@ public class VoiceRecognitionManager {
             DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
             Mixer preferredMixer = VoiceAudioDeviceManager.getPreferredMixer();
-            line = preferredMixer != null
-                    ? (TargetDataLine) preferredMixer.getLine(info)
-                    : (TargetDataLine) AudioSystem.getLine(info);
-            line.open(format);
+            line = openTargetLine(preferredMixer, info, format);
             line.start();
 
             audioBuffer = new ByteArrayOutputStream();
@@ -368,6 +366,23 @@ public class VoiceRecognitionManager {
             }
             line = null;
         }
+    }
+
+    private static TargetDataLine openTargetLine(Mixer preferredMixer, DataLine.Info info, AudioFormat format)
+            throws LineUnavailableException {
+        if (preferredMixer != null) {
+            try {
+                TargetDataLine preferredLine = (TargetDataLine) preferredMixer.getLine(info);
+                preferredLine.open(format);
+                return preferredLine;
+            } catch (IllegalArgumentException | LineUnavailableException e) {
+                LOGGER.warn("[VoiceCastAddon] Preferred input device failed, falling back to system default: {}", e.getMessage());
+            }
+        }
+
+        TargetDataLine defaultLine = (TargetDataLine) AudioSystem.getLine(info);
+        defaultLine.open(format);
+        return defaultLine;
     }
 
     private static String describeThrowable(Throwable t) {
