@@ -10,6 +10,7 @@ import org.vosk.Recognizer;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -62,7 +63,10 @@ public class VoiceRecognitionManager {
             AudioFormat format = new AudioFormat(SAMPLE_RATE, 16, 1, true, false);
             DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
 
-            line = (TargetDataLine) AudioSystem.getLine(info);
+            Mixer preferredMixer = VoiceAudioDeviceManager.getPreferredMixer();
+            line = preferredMixer != null
+                    ? (TargetDataLine) preferredMixer.getLine(info)
+                    : (TargetDataLine) AudioSystem.getLine(info);
             line.open(format);
             line.start();
 
@@ -182,8 +186,20 @@ public class VoiceRecognitionManager {
                 return;
             }
 
-            loadModel("en_us", ENGLISH_MODEL_DIR, true);
-            loadModel("zh_cn", CHINESE_MODEL_DIR, false);
+            List<Path> customModelDirs = VoiceCastClientConfig.findCustomModelDirectories();
+            if (!customModelDirs.isEmpty()) {
+                for (Path customModelDir : customModelDirs) {
+                    try {
+                        loadModel(customModelDir.getFileName().toString(), customModelDir.toFile());
+                    } catch (IOException e) {
+                        LOGGER.error("[VoiceCastAddon] Failed to load custom model {}", customModelDir, e);
+                    }
+                }
+                LOGGER.info("[VoiceCastAddon] Using {} custom Vosk model(s); bundled small models are disabled", customModelDirs.size());
+            } else {
+                loadBundledModel("en_us", ENGLISH_MODEL_DIR, true);
+                loadBundledModel("zh_cn", CHINESE_MODEL_DIR, false);
+            }
 
             if (MODELS.isEmpty()) {
                 throw new IllegalStateException("Could not find any Vosk model directory");
@@ -191,7 +207,7 @@ public class VoiceRecognitionManager {
         }
     }
 
-    private static void loadModel(String key, String modelDirectoryName, boolean allowJarFallback) {
+    private static void loadBundledModel(String key, String modelDirectoryName, boolean allowJarFallback) {
         try {
             File modelDir = tryLoadModelFromExternalPath(modelDirectoryName);
             if (modelDir == null && allowJarFallback) {
@@ -203,11 +219,15 @@ public class VoiceRecognitionManager {
                 return;
             }
 
-            MODELS.put(key, new Model(modelDir.getAbsolutePath()));
-            LOGGER.info("[VoiceCastAddon] Vosk model {} loaded from {}", key, modelDir.getAbsolutePath());
+            loadModel(key, modelDir);
         } catch (Throwable t) {
             LOGGER.error("[VoiceCastAddon] Failed to load model {}: {}", modelDirectoryName, describeThrowable(t), t);
         }
+    }
+
+    private static void loadModel(String key, File modelDir) throws IOException {
+        MODELS.put(key, new Model(modelDir.getAbsolutePath()));
+        LOGGER.info("[VoiceCastAddon] Vosk model {} loaded from {}", key, modelDir.getAbsolutePath());
     }
 
     private static File tryLoadModelFromExternalPath(String modelDirectoryName) {

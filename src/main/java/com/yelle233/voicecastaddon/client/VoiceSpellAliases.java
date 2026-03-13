@@ -8,32 +8,14 @@ import java.util.Map;
 
 public class VoiceSpellAliases {
     private static final Map<String, ResourceLocation> ALIASES = new HashMap<>();
-
-    static {
-        add("fireball", "irons_spellbooks:fireball");
-        add("fire ball", "irons_spellbooks:fireball");
-        add("\u706b\u7403", "irons_spellbooks:fireball");
-        add("\u706b\u7403\u672f", "irons_spellbooks:fireball");
-
-        add("heal", "irons_spellbooks:heal");
-        add("healing", "irons_spellbooks:heal");
-        add("\u6cbb\u7597", "irons_spellbooks:heal");
-        add("\u6cbb\u7597\u672f", "irons_spellbooks:heal");
-
-        add("lightning", "irons_spellbooks:lightning_lance");
-        add("lightning lance", "irons_spellbooks:lightning_lance");
-        add("\u95ea\u7535", "irons_spellbooks:lightning_lance");
-        add("\u96f7\u67aa", "irons_spellbooks:lightning_lance");
-    }
-
-    private static void add(String alias, String spellId) {
-        ALIASES.put(normalize(alias), ResourceLocation.parse(spellId));
-    }
+    private static volatile boolean loaded = false;
 
     public static ResourceLocation match(String rawText) {
         if (rawText == null) {
             return null;
         }
+
+        ensureLoaded();
         return ALIASES.get(normalize(rawText));
     }
 
@@ -49,6 +31,22 @@ public class VoiceSpellAliases {
                 .replace("?", " ")
                 .trim()
                 .replaceAll("\\s+", " ");
+    }
+
+    public static synchronized void reload() {
+        ALIASES.clear();
+        VoiceCastClientConfig.loadSpellAliases().forEach((spellId, aliases) -> {
+            for (String alias : aliases) {
+                ALIASES.put(normalize(alias), ResourceLocation.parse(spellId));
+            }
+        });
+        loaded = true;
+    }
+
+    private static void ensureLoaded() {
+        if (!loaded) {
+            reload();
+        }
     }
 
     private VoiceSpellAliases() {
