@@ -9,13 +9,13 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 public class VoiceCastSettingsScreen extends Screen {
-    private static final Component TITLE = Component.literal("Voice Cast Addon");
-    private static final Component DEVICE_LABEL = Component.literal("\u8bed\u97f3\u8f93\u5165\u8bbe\u5907");
-    private static final Component REFRESH_LABEL = Component.literal("\u5237\u65b0\u8bbe\u5907\u5217\u8868");
-    private static final Component SAVE_LABEL = Component.literal("\u4fdd\u5b58");
-    private static final Component BACK_LABEL = Component.literal("\u8fd4\u56de");
-    private static final Component NOTE_1 = Component.literal("\u4fee\u6539\u540e\u5c06\u5728\u4e0b\u6b21\u5f00\u59cb\u8bed\u97f3\u8bc6\u522b\u65f6\u751f\u6548\u3002");
-    private static final Component NOTE_2 = Component.literal("\u5982\u679c\u9009\u62e9\u7684\u8bbe\u5907\u4e0d\u53ef\u7528\uff0c\u4f1a\u81ea\u52a8\u56de\u9000\u5230\u7cfb\u7edf\u9ed8\u8ba4\u8bbe\u5907\u3002");
+    private static final Component TITLE = Component.translatable("voicecastaddon.settings.title");
+    private static final Component DEVICE_LABEL = Component.translatable("voicecastaddon.settings.device_label");
+    private static final Component REFRESH_LABEL = Component.translatable("voicecastaddon.settings.refresh");
+    private static final Component SAVE_LABEL = Component.translatable("voicecastaddon.settings.save");
+    private static final Component BACK_LABEL = Component.translatable("voicecastaddon.settings.back");
+    private static final Component NOTE_1 = Component.translatable("voicecastaddon.settings.note1");
+    private static final Component NOTE_2 = Component.translatable("voicecastaddon.settings.note2");
 
     private final Screen parent;
     private List<VoiceAudioDeviceManager.AudioInputDevice> devices = List.of();

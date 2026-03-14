@@ -174,6 +174,30 @@ public class VoiceRecognitionManager {
         warmUpThread.start();
     }
 
+    public static void warmUpSync() {
+        if (warmUpStarted) {
+            return;
+        }
+
+        synchronized (MODEL_LOCK) {
+            if (warmUpStarted) {
+                return;
+            }
+            warmUpStarted = true;
+        }
+
+        LOGGER.info("[VoiceCastAddon] Starting synchronous model loading...");
+        long startTime = System.currentTimeMillis();
+        try {
+            initModelsIfNeeded();
+            long duration = System.currentTimeMillis() - startTime;
+            LOGGER.info("[VoiceCastAddon] Models loaded successfully in {}ms", duration);
+        } catch (Throwable t) {
+            lastError = describeThrowable(t);
+            LOGGER.error("[VoiceCastAddon] Failed to load models: {}", lastError, t);
+        }
+    }
+
     private static void initModelsIfNeeded() {
         if (!MODELS.isEmpty()) {
             return;

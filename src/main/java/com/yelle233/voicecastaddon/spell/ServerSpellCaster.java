@@ -17,16 +17,12 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 public class ServerSpellCaster {
-    private static final String MSG_INVALID_SPELL_ID = "\u975e\u6cd5\u6cd5\u672fID: ";
-    private static final String MSG_SPELL_NOT_FOUND = "\u672a\u627e\u5230\u53ef\u91ca\u653e\u7684\u6cd5\u672f\u3002\u8bf7\u624b\u6301\u5377\u8f74/\u6cd5\u672f\u5bb9\u5668\uff0c\u6216\u88c5\u5907\u5305\u542b\u8be5\u6cd5\u672f\u7684\u9b54\u6cd5\u4e66\u3002";
-    private static final String MSG_CAST_FAILED = "\u65bd\u6cd5\u5931\u8d25\uff1a\u53ef\u80fd\u5728\u51b7\u5374\u4e2d\u3001\u84dd\u91cf\u4e0d\u8db3\u6216\u91ca\u653e\u6761\u4ef6\u4e0d\u6ee1\u8db3\u3002";
-
     public static void castByVoice(ServerPlayer player, String spokenSpellIdString) {
         ResourceLocation spokenSpellId;
         try {
             spokenSpellId = ResourceLocation.parse(spokenSpellIdString);
         } catch (Exception e) {
-            player.sendSystemMessage(Component.literal(MSG_INVALID_SPELL_ID + spokenSpellIdString));
+            player.sendSystemMessage(Component.translatable("voicecastaddon.server.invalid_spell_id", spokenSpellIdString));
             return;
         }
 
@@ -43,7 +39,7 @@ public class ServerSpellCaster {
             return;
         }
 
-        player.sendSystemMessage(Component.literal(MSG_SPELL_NOT_FOUND));
+        player.sendSystemMessage(Component.translatable("voicecastaddon.server.spell_not_found"));
     }
 
     private static boolean tryCastFromStack(ServerPlayer player,
@@ -95,7 +91,7 @@ public class ServerSpellCaster {
         );
 
         if (!success) {
-            player.sendSystemMessage(Component.literal(MSG_CAST_FAILED));
+            player.sendSystemMessage(Component.translatable("voicecastaddon.server.cast_failed"));
         }
 
         return success;

@@ -15,12 +15,6 @@ import java.util.List;
 
 @EventBusSubscriber(modid = VoiceCastAddon.MODID, value = Dist.CLIENT)
 public class VoiceInputController {
-    private static final String MSG_START_LISTENING = "\u5f00\u59cb\u8bed\u97f3\u8bc6\u522b...";
-    private static final String MSG_START_FAILED = "\u8bed\u97f3\u8bc6\u522b\u542f\u52a8\u5931\u8d25: ";
-    private static final String MSG_NO_CONTENT = "\u6ca1\u6709\u8bc6\u522b\u5230\u5185\u5bb9";
-    private static final String MSG_MATCHED = "\u8bc6\u522b\u7ed3\u679c: ";
-    private static final String MSG_UNMATCHED = "\u672a\u5339\u914d\u5230\u6cd5\u672f: ";
-
     private static boolean wasDown = false;
     private static volatile boolean recognitionInProgress = false;
 
@@ -35,10 +29,10 @@ public class VoiceInputController {
 
         if (isDown && !wasDown && !recognitionInProgress) {
             if (VoiceRecognitionManager.startListening()) {
-                mc.player.displayClientMessage(Component.literal(MSG_START_LISTENING), true);
+                mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.start_listening"), true);
             } else {
                 mc.player.displayClientMessage(
-                        Component.literal(MSG_START_FAILED + VoiceRecognitionManager.getLastError()),
+                        Component.translatable("voicecastaddon.message.start_failed", VoiceRecognitionManager.getLastError()),
                         true
                 );
             }
@@ -69,7 +63,7 @@ public class VoiceInputController {
                 }
 
                 if (recognizedTexts.isEmpty()) {
-                    mc.player.displayClientMessage(Component.literal(MSG_NO_CONTENT), true);
+                    mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.no_content"), true);
                     return;
                 }
 
@@ -80,15 +74,16 @@ public class VoiceInputController {
                     }
 
                     PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
+                    Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
                     mc.player.displayClientMessage(
-                            Component.literal(MSG_MATCHED + recognizedText + " -> " + spellId),
+                            Component.translatable("voicecastaddon.message.matched", spellName),
                             true
                     );
                     return;
                 }
 
                 mc.player.displayClientMessage(
-                        Component.literal(MSG_UNMATCHED + String.join(" / ", recognizedTexts)),
+                        Component.translatable("voicecastaddon.message.unmatched", String.join(" / ", recognizedTexts)),
                         true
                 );
             } finally {

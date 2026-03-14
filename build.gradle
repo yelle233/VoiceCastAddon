@@ -163,6 +163,10 @@ dependencies {
     localRuntime group: 'com.alphacephei', name: 'vosk', version: '0.3.45'
     jarJar(group: 'com.alphacephei', name: 'vosk', version: '[0.3.45,0.4.0)')
 
+    implementation group: 'com.belerweb', name: 'pinyin4j', version: '2.5.1'
+    localRuntime group: 'com.belerweb', name: 'pinyin4j', version: '2.5.1'
+    jarJar(group: 'com.belerweb', name: 'pinyin4j', version: '[2.5.1,3.0.0)')
+
     implementation "curse.maven:irons-spells-n-spellbooks-855414:7691161"
 }
 

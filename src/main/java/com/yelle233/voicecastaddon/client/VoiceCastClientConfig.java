@@ -27,6 +27,9 @@ public final class VoiceCastClientConfig {
     private static final String CUSTOM_MODELS_DIR_NAME = "custom-voice-models";
     private static final String INPUT_DEVICE_KEY = "preferredInputDeviceId";
 
+    private static final String CONFIG_VERSION_KEY = "_config_version";
+    private static final int CURRENT_CONFIG_VERSION = 1;
+
     private VoiceCastClientConfig() {
     }
 
@@ -34,9 +37,13 @@ public final class VoiceCastClientConfig {
         try {
             Files.createDirectories(getConfigDir());
             Files.createDirectories(getCustomModelsDir());
+
             if (Files.notExists(getAliasFile())) {
                 writeDefaultAliasFile();
+            } else {
+                mergeAliasFileIfNeeded();
             }
+
             if (Files.notExists(getSettingsFile())) {
                 writeDefaultSettingsFile();
             }
@@ -54,6 +61,10 @@ public final class VoiceCastClientConfig {
             JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
             for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
+                if (entry.getKey().startsWith("_")) {
+                    continue;
+                }
+
                 if (!entry.getValue().isJsonArray()) {
                     continue;
                 }
@@ -130,6 +141,13 @@ public final class VoiceCastClientConfig {
         return getConfigDir();
     }
 
+    public static void saveSpellAliases(Map<String, List<String>> aliases) throws IOException {
+        ensureClientFiles();
+        JsonObject aliasObject = createAliasJsonObject(aliases, CURRENT_CONFIG_VERSION);
+        Files.writeString(getAliasFile(), GSON.toJson(aliasObject), StandardCharsets.UTF_8);
+        LOGGER.info("[VoiceCastAddon] Saved spell aliases config with {} spells", aliases.size());
+    }
+
     private static Path getConfigDir() {
         return FMLPaths.CONFIGDIR.get().resolve("voicecastaddon");
     }
@@ -148,7 +166,92 @@ public final class VoiceCastClientConfig {
     }
 
     private static void writeDefaultAliasFile() throws IOException {
-        Files.writeString(getAliasFile(), GSON.toJson(defaultAliases()), StandardCharsets.UTF_8);
+        JsonObject aliasObject = createAliasJsonObject(defaultAliases(), CURRENT_CONFIG_VERSION);
+        Files.writeString(getAliasFile(), GSON.toJson(aliasObject), StandardCharsets.UTF_8);
+    }
+
+    private static void mergeAliasFileIfNeeded() {
+        try {
+            String json = Files.readString(getAliasFile(), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+            int fileVersion = 0;
+            if (root.has(CONFIG_VERSION_KEY) && root.get(CONFIG_VERSION_KEY).isJsonPrimitive()) {
+                fileVersion = root.get(CONFIG_VERSION_KEY).getAsInt();
+            }
+
+            if (fileVersion >= CURRENT_CONFIG_VERSION) {
+                return;
+            }
+
+            LOGGER.info("[VoiceCastAddon] Detected outdated config version {} (current: {}), merging with defaults...",
+                    fileVersion, CURRENT_CONFIG_VERSION);
+
+            Map<String, List<String>> userAliases = new LinkedHashMap<>();
+            for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
+                if (entry.getKey().startsWith("_")) {
+                    continue;
+                }
+
+                if (!entry.getValue().isJsonArray()) {
+                    continue;
+                }
+
+                List<String> values = new ArrayList<>();
+                entry.getValue().getAsJsonArray().forEach(element -> {
+                    if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+                        values.add(element.getAsString());
+                    }
+                });
+
+                if (!values.isEmpty()) {
+                    userAliases.put(entry.getKey(), values);
+                }
+            }
+
+            Map<String, List<String>> defaultAliases = defaultAliases();
+            Map<String, List<String>> mergedAliases = new LinkedHashMap<>();
+
+            for (Map.Entry<String, List<String>> entry : defaultAliases.entrySet()) {
+                if (userAliases.containsKey(entry.getKey())) {
+                    mergedAliases.put(entry.getKey(), userAliases.get(entry.getKey()));
+                    LOGGER.debug("[VoiceCastAddon] Keeping user config for spell: {}", entry.getKey());
+                } else {
+                    mergedAliases.put(entry.getKey(), entry.getValue());
+                    LOGGER.info("[VoiceCastAddon] Adding new spell to config: {}", entry.getKey());
+                }
+            }
+
+            for (Map.Entry<String, List<String>> entry : userAliases.entrySet()) {
+                if (!mergedAliases.containsKey(entry.getKey())) {
+                    mergedAliases.put(entry.getKey(), entry.getValue());
+                    LOGGER.debug("[VoiceCastAddon] Keeping user custom spell: {}", entry.getKey());
+                }
+            }
+
+            Path backupFile = getAliasFile().getParent().resolve(ALIAS_FILE_NAME + ".backup");
+            Files.copy(getAliasFile(), backupFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            LOGGER.info("[VoiceCastAddon] Created backup at: {}", backupFile);
+
+            JsonObject mergedObject = createAliasJsonObject(mergedAliases, CURRENT_CONFIG_VERSION);
+            Files.writeString(getAliasFile(), GSON.toJson(mergedObject), StandardCharsets.UTF_8);
+
+            LOGGER.info("[VoiceCastAddon] Config merge completed. Updated to version {}", CURRENT_CONFIG_VERSION);
+
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to merge alias config", e);
+        }
+    }
+
+    private static JsonObject createAliasJsonObject(Map<String, List<String>> aliases, int version) {
+        JsonObject root = new JsonObject();
+        root.addProperty(CONFIG_VERSION_KEY, version);
+
+        for (Map.Entry<String, List<String>> entry : aliases.entrySet()) {
+            root.add(entry.getKey(), GSON.toJsonTree(entry.getValue()));
+        }
+
+        return root;
     }
 
     private static void writeDefaultSettingsFile() throws IOException {
@@ -167,9 +270,13 @@ public final class VoiceCastClientConfig {
 
     private static Map<String, List<String>> defaultAliases() {
         Map<String, List<String>> defaults = new LinkedHashMap<>();
-        defaults.put("irons_spellbooks:fireball", List.of("fireball", "fire ball", "\u706b\u7403", "\u706b\u7403\u672f"));
-        defaults.put("irons_spellbooks:heal", List.of("heal", "healing", "\u6cbb\u7597", "\u6cbb\u7597\u672f"));
-        defaults.put("irons_spellbooks:lightning_lance", List.of("lightning", "lightning lance", "\u95ea\u7535", "\u95ea\u7535\u67aa"));
+
+        // Example spells - 示例法术
+        // Players should use "/voicecast generate" command to auto-generate all spell configurations
+        // 玩家应使用 "/voicecast generate" 命令自动生成所有法术配置
+        defaults.put("irons_spellbooks:fireball", List.of("fireball", "火球"));
+        defaults.put("irons_spellbooks:heal", List.of("heal", "治疗术"));
+
         return defaults;
     }
 

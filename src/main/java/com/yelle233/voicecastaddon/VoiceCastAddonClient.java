@@ -24,9 +24,9 @@ public class VoiceCastAddonClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         System.setProperty("jna.encoding", "UTF-8");
-        event.enqueueWork(() -> {
-            VoiceCastClientConfig.ensureClientFiles();
-            VoiceRecognitionManager.warmUpAsync();
-        });
+        VoiceCastClientConfig.ensureClientFiles();
+
+        // 立即在主线程上开始加载模型，不要延迟
+        VoiceRecognitionManager.warmUpSync();
     }
 }
