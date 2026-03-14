@@ -3,6 +3,8 @@ package com.yelle233.voicecastaddon.client;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import com.yelle233.voicecastaddon.client.online.OnlineSpeechRecognizer;
+import com.yelle233.voicecastaddon.client.online.TencentSpeechRecognizer;
 import org.slf4j.Logger;
 import org.vosk.Model;
 import org.vosk.Recognizer;
@@ -52,6 +54,7 @@ public class VoiceRecognitionManager {
     private static volatile boolean warmUpStarted = false;
 
     private static final Map<String, Model> MODELS = new LinkedHashMap<>();
+    private static OnlineSpeechRecognizer onlineRecognizer;
 
     public static boolean startListening() {
         if (listening) {
@@ -116,6 +119,33 @@ public class VoiceRecognitionManager {
             return List.of();
         }
 
+        String recognitionMode = VoiceCastClientConfig.getRecognitionMode();
+
+        // Online mode: use online recognizer only
+        if ("online".equals(recognitionMode)) {
+            return recognizeOnline(audioBytes);
+        }
+
+        // Offline mode: use VOSK models only
+        if ("offline".equals(recognitionMode)) {
+            return recognizeOffline(audioBytes);
+        }
+
+        // Hybrid mode: try online first for better accuracy, fallback to offline
+        if ("hybrid".equals(recognitionMode)) {
+            List<String> onlineResults = recognizeOnline(audioBytes);
+            if (!onlineResults.isEmpty()) {
+                return onlineResults;
+            }
+            LOGGER.info("[VoiceCastAddon] Online recognition failed or returned empty, falling back to offline");
+            return recognizeOffline(audioBytes);
+        }
+
+        // Default to offline
+        return recognizeOffline(audioBytes);
+    }
+
+    private static List<String> recognizeOffline(byte[] audioBytes) {
         List<ModelResult> results = MODELS.entrySet().stream()
                 .map(entry -> CompletableFuture.supplyAsync(() ->
                         new ModelResult(entry.getKey(), recognizeWithModel(entry.getKey(), entry.getValue(), audioBytes))))
@@ -140,6 +170,42 @@ public class VoiceRecognitionManager {
             }
         }
         return candidates;
+    }
+
+    private static List<String> recognizeOnline(byte[] audioBytes) {
+        try {
+            ensureOnlineRecognizer();
+            if (onlineRecognizer == null) {
+                LOGGER.warn("[VoiceCastAddon] Online recognizer not available");
+                return List.of();
+            }
+
+            String result = onlineRecognizer.recognize(audioBytes, (int) SAMPLE_RATE);
+            if (result != null && !result.isBlank()) {
+                LOGGER.info("[VoiceCastAddon] Online recognition result: {}", result);
+                return List.of(result);
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Online recognition failed: {}", e.getMessage(), e);
+        }
+        return List.of();
+    }
+
+    private static void ensureOnlineRecognizer() {
+        if (onlineRecognizer != null) {
+            return;
+        }
+
+        String secretId = VoiceCastClientConfig.getTencentSecretId();
+        String secretKey = VoiceCastClientConfig.getTencentSecretKey();
+
+        if (secretId.isBlank() || secretKey.isBlank()) {
+            LOGGER.warn("[VoiceCastAddon] Tencent API credentials not configured");
+            return;
+        }
+
+        onlineRecognizer = new TencentSpeechRecognizer(secretId, secretKey);
+        LOGGER.info("[VoiceCastAddon] Initialized Tencent online recognizer");
     }
 
     public static boolean isListening() {

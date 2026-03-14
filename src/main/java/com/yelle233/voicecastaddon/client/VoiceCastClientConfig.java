@@ -26,9 +26,15 @@ public final class VoiceCastClientConfig {
     private static final String SETTINGS_FILE_NAME = "client_settings.json";
     private static final String CUSTOM_MODELS_DIR_NAME = "custom-voice-models";
     private static final String INPUT_DEVICE_KEY = "preferredInputDeviceId";
+    private static final String RECOGNITION_MODE_KEY = "recognitionMode";
+    private static final String TENCENT_SECRET_ID = "tencentSecretId";
+    private static final String TENCENT_SECRET_KEY = "tencentSecretKey";
+    private static final String LONG_SENTENCE_THRESHOLD_KEY = "longSentenceThreshold";
 
     private static final String CONFIG_VERSION_KEY = "_config_version";
     private static final int CURRENT_CONFIG_VERSION = 1;
+    private static final String SETTINGS_VERSION_KEY = "_settings_version";
+    private static final int CURRENT_SETTINGS_VERSION = 2; // Increment when settings schema changes
 
     private VoiceCastClientConfig() {
     }
@@ -46,6 +52,8 @@ public final class VoiceCastClientConfig {
 
             if (Files.notExists(getSettingsFile())) {
                 writeDefaultSettingsFile();
+            } else {
+                mergeSettingsFileIfNeeded();
             }
         } catch (IOException e) {
             LOGGER.error("[VoiceCastAddon] Failed to initialize client config files", e);
@@ -258,6 +266,67 @@ public final class VoiceCastClientConfig {
         Files.writeString(getSettingsFile(), GSON.toJson(defaultSettings()), StandardCharsets.UTF_8);
     }
 
+    private static void mergeSettingsFileIfNeeded() {
+        try {
+            String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
+            JsonObject current = JsonParser.parseString(json).getAsJsonObject();
+
+            // Check version
+            int fileVersion = 0;
+            if (current.has(SETTINGS_VERSION_KEY) && current.get(SETTINGS_VERSION_KEY).isJsonPrimitive()) {
+                fileVersion = current.get(SETTINGS_VERSION_KEY).getAsInt();
+            }
+
+            if (fileVersion >= CURRENT_SETTINGS_VERSION) {
+                return; // Already up to date
+            }
+
+            LOGGER.info("[VoiceCastAddon] Migrating settings from version {} to {}", fileVersion, CURRENT_SETTINGS_VERSION);
+
+            JsonObject defaults = defaultSettings();
+            JsonObject merged = new JsonObject();
+
+            // Copy version
+            merged.addProperty(SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION);
+
+            // Migrate known fields from old to new
+            for (String key : defaults.keySet()) {
+                if (key.equals(SETTINGS_VERSION_KEY)) {
+                    continue; // Already added
+                }
+
+                if (current.has(key)) {
+                    // Keep user's value
+                    merged.add(key, current.get(key));
+                    LOGGER.debug("[VoiceCastAddon] Preserved setting: {} = {}", key, current.get(key));
+                } else {
+                    // Use default value
+                    merged.add(key, defaults.get(key));
+                    LOGGER.info("[VoiceCastAddon] Added new setting: {} = {}", key, defaults.get(key));
+                }
+            }
+
+            // Log removed fields
+            for (String key : current.keySet()) {
+                if (!merged.has(key) && !key.startsWith("_")) {
+                    LOGGER.info("[VoiceCastAddon] Removed obsolete setting: {}", key);
+                }
+            }
+
+            // Create backup
+            Path backupFile = getSettingsFile().getParent().resolve(SETTINGS_FILE_NAME + ".backup");
+            Files.copy(getSettingsFile(), backupFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            LOGGER.info("[VoiceCastAddon] Created settings backup at: {}", backupFile);
+
+            // Write merged settings
+            Files.writeString(getSettingsFile(), GSON.toJson(merged), StandardCharsets.UTF_8);
+            LOGGER.info("[VoiceCastAddon] Settings migrated successfully to version {}", CURRENT_SETTINGS_VERSION);
+
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to merge settings file", e);
+        }
+    }
+
     private static JsonObject readSettingsObject() {
         try {
             String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
@@ -280,7 +349,52 @@ public final class VoiceCastClientConfig {
 
     private static JsonObject defaultSettings() {
         JsonObject root = new JsonObject();
+        root.addProperty(SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION);
         root.addProperty(INPUT_DEVICE_KEY, "");
+        root.addProperty(RECOGNITION_MODE_KEY, "offline"); // offline, online, hybrid
+        root.addProperty(TENCENT_SECRET_ID, "");
+        root.addProperty(TENCENT_SECRET_KEY, "");
+        root.addProperty(LONG_SENTENCE_THRESHOLD_KEY, 10);
         return root;
+    }
+
+    public static String getRecognitionMode() {
+        return getSettingString(RECOGNITION_MODE_KEY, "offline");
+    }
+
+    public static String getTencentSecretId() {
+        return getSettingString(TENCENT_SECRET_ID, "");
+    }
+
+    public static String getTencentSecretKey() {
+        return getSettingString(TENCENT_SECRET_KEY, "");
+    }
+
+    public static int getLongSentenceThreshold() {
+        ensureClientFiles();
+        try {
+            String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            if (root.has(LONG_SENTENCE_THRESHOLD_KEY)) {
+                return root.get(LONG_SENTENCE_THRESHOLD_KEY).getAsInt();
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to load long sentence threshold", e);
+        }
+        return 10;
+    }
+
+    private static String getSettingString(String key, String defaultValue) {
+        ensureClientFiles();
+        try {
+            String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            if (root.has(key)) {
+                return root.get(key).getAsString();
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to load setting {}", key, e);
+        }
+        return defaultValue;
     }
 }

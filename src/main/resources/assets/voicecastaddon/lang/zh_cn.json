@@ -27,5 +27,9 @@
   "voicecastaddon.command.generate.reloaded": "配置已重新加载！",
   "voicecastaddon.command.generate.error": "生成配置失败: %s",
   "voicecastaddon.command.reload.success": "配置已重新加载！",
-  "voicecastaddon.command.reload.error": "重新加载配置失败: %s"
+  "voicecastaddon.command.reload.error": "重新加载配置失败: %s",
+  "voicecastaddon.config.recognition_mode": "识别模式",
+  "voicecastaddon.config.recognition_mode.offline": "离线模式（VOSK）",
+  "voicecastaddon.config.recognition_mode.online": "在线模式（腾讯云）",
+  "voicecastaddon.config.recognition_mode.hybrid": "混合模式（在线优先）"
 }
