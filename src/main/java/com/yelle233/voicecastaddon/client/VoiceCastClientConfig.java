@@ -274,8 +274,6 @@ public final class VoiceCastClientConfig {
         // Example spells - 示例法术
         // Players should use "/voicecast generate" command to auto-generate all spell configurations
         // 玩家应使用 "/voicecast generate" 命令自动生成所有法术配置
-        defaults.put("irons_spellbooks:fireball", List.of("fireball", "火球"));
-        defaults.put("irons_spellbooks:heal", List.of("heal", "治疗术"));
 
         return defaults;
     }

@@ -217,14 +217,18 @@ public class VoiceRecognitionManager {
                         LOGGER.error("[VoiceCastAddon] Failed to load custom model {}", customModelDir, e);
                     }
                 }
-                LOGGER.info("[VoiceCastAddon] Using {} custom Vosk model(s); bundled small models are disabled", customModelDirs.size());
+                LOGGER.info("[VoiceCastAddon] Using {} custom Vosk model(s); bundled models are disabled", customModelDirs.size());
             } else {
                 loadBundledModel("en_us", ENGLISH_MODEL_DIR, true);
-                loadBundledModel("zh_cn", CHINESE_MODEL_DIR, false);
+                loadBundledModel("zh_cn", CHINESE_MODEL_DIR, true);
             }
 
             if (MODELS.isEmpty()) {
-                throw new IllegalStateException("Could not find any Vosk model directory");
+                String errorMsg = "Could not find any Vosk model. Please check logs for details.";
+                LOGGER.error("[VoiceCastAddon] {}", errorMsg);
+                LOGGER.error("[VoiceCastAddon] Attempted to load bundled models: {} and {}", ENGLISH_MODEL_DIR, CHINESE_MODEL_DIR);
+                LOGGER.error("[VoiceCastAddon] Also checked custom model directory: {}", VoiceCastClientConfig.getCustomModelsDir());
+                throw new IllegalStateException(errorMsg);
             }
         }
     }
@@ -271,11 +275,21 @@ public class VoiceRecognitionManager {
 
     private static File extractModelFromJar(String modelDirectoryName) {
         try {
+            LOGGER.info("[VoiceCastAddon] Attempting to extract model {} from jar", modelDirectoryName);
             Path tempDir = Files.createTempDirectory("voicecastaddon-vosk-model");
             File modelDir = tempDir.toFile();
             modelDir.deleteOnExit();
 
             String resourcePath = "/assets/voicecastaddon/voice-models/" + modelDirectoryName;
+            LOGGER.info("[VoiceCastAddon] Looking for resource at: {}", resourcePath);
+
+            URL resourceUrl = VoiceRecognitionManager.class.getResource(resourcePath);
+            if (resourceUrl == null) {
+                LOGGER.error("[VoiceCastAddon] Resource not found: {}", resourcePath);
+                return null;
+            }
+
+            LOGGER.info("[VoiceCastAddon] Found resource URL: {}", resourceUrl);
             copyResourceDirectory(resourcePath, modelDir.toPath());
 
             LOGGER.info("[VoiceCastAddon] Extracted model from jar to {}", modelDir.getAbsolutePath());
@@ -306,26 +320,43 @@ public class VoiceRecognitionManager {
             throw new IOException("Missing resource: " + resourcePath);
         }
 
-        try {
-            if (resourceUrl.toString().startsWith("jar:")) {
-                copyFromJar(resourcePath, targetDir);
-            } else {
-                Path sourcePath = Paths.get(resourceUrl.toURI());
-                copyDirectory(sourcePath, targetDir);
-            }
-        } catch (URISyntaxException e) {
-            throw new IOException("Invalid model resource path", e);
-        }
+        LOGGER.info("[VoiceCastAddon] Copying resource directory using manual file list");
+        // NeoForge uses union: filesystem which doesn't support Files.walk()
+        // Use manual file list instead
+        copyResourceFilesManually(resourcePath, targetDir);
     }
 
     private static void copyFromJar(String resourcePath, Path targetDir) throws IOException {
-        String jarPath = VoiceRecognitionManager.class.getProtectionDomain()
-                .getCodeSource().getLocation().getPath();
+        LOGGER.info("[VoiceCastAddon] Copying from jar, resource path: {}", resourcePath);
 
-        try (FileSystem fs = FileSystems.newFileSystem(Paths.get(jarPath), (ClassLoader) null)) {
-            Path source = fs.getPath(resourcePath);
-            copyDirectory(source, targetDir);
+        try {
+            URL resourceUrl = VoiceRecognitionManager.class.getResource(resourcePath);
+            if (resourceUrl == null) {
+                throw new IOException("Resource not found: " + resourcePath);
+            }
+
+            String urlString = resourceUrl.toString();
+            LOGGER.info("[VoiceCastAddon] Resource URL: {}", urlString);
+
+            if (urlString.startsWith("jar:")) {
+                String jarPathString = urlString.substring(4, urlString.indexOf("!"));
+                Path jarPath = Paths.get(new URL(jarPathString).toURI());
+
+                LOGGER.info("[VoiceCastAddon] Opening jar file: {}", jarPath);
+
+                try (FileSystem fs = FileSystems.newFileSystem(jarPath, (ClassLoader) null)) {
+                    Path source = fs.getPath(resourcePath);
+                    if (!Files.exists(source)) {
+                        throw new IOException("Path does not exist in jar: " + resourcePath);
+                    }
+                    copyDirectory(source, targetDir);
+                    LOGGER.info("[VoiceCastAddon] Successfully copied directory from jar");
+                }
+            } else {
+                throw new IOException("Not a jar URL: " + urlString);
+            }
         } catch (Exception e) {
+            LOGGER.warn("[VoiceCastAddon] Failed to copy from jar using FileSystem, falling back to manual copy: {}", e.getMessage());
             copyResourceFilesManually(resourcePath, targetDir);
         }
     }

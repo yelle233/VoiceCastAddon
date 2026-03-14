@@ -20,7 +20,9 @@
       "Bash(cd \"D:\\\\mod_development\\\\voicecastaddon-1.21.1\" && ./gradlew dependencies --configuration runtimeClasspath 2>&1 | grep -E \"vosk|jna\" | grep -v \">\" | head -5)",
       "Bash(./gradlew build:*)",
       "Bash(ls -la *.md)",
-      "Bash(find src:*)"
+      "Bash(find src:*)",
+      "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep voice-models | head -20)",
+      "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep \"vosk-model-small-en-us\" | head -10)"
     ]
   }
 }

@@ -155,9 +155,9 @@ dependencies {
     // Vosk 语音识别库
     // implementation: 开发环境和编译时需要
     // jarJar: 打包到最终 jar 文件中（生产环境）
-    implementation group: 'net.java.dev.jna', name: 'jna', version: '5.7.0'
+    // JNA 已由 Minecraft/NeoForge 提供，不需要打包
+    compileOnly group: 'net.java.dev.jna', name: 'jna', version: '5.7.0'
     localRuntime group: 'net.java.dev.jna', name: 'jna', version: '5.7.0'
-    jarJar(group: 'net.java.dev.jna', name: 'jna', version: '[5.7.0,6.0.0)')
 
     implementation group: 'com.alphacephei', name: 'vosk', version: '0.3.45'
     localRuntime group: 'com.alphacephei', name: 'vosk', version: '0.3.45'
