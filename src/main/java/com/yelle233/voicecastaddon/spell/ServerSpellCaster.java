@@ -22,7 +22,6 @@ public class ServerSpellCaster {
         try {
             spokenSpellId = ResourceLocation.parse(spokenSpellIdString);
         } catch (Exception e) {
-            player.sendSystemMessage(Component.translatable("voicecastaddon.server.invalid_spell_id", spokenSpellIdString));
             return;
         }
 
@@ -39,7 +38,7 @@ public class ServerSpellCaster {
             return;
         }
 
-        player.sendSystemMessage(Component.translatable("voicecastaddon.server.spell_not_found"));
+        player.displayClientMessage(Component.translatable("voicecastaddon.server.spell_not_found"), true);
     }
 
     private static boolean tryCastFromStack(ServerPlayer player,
@@ -97,12 +96,11 @@ public class ServerSpellCaster {
                 return true;
             } catch (Exception e) {
                 // If direct cast fails, fallback to normal cast
-                player.sendSystemMessage(Component.translatable("voicecastaddon.server.instant_cast_failed"));
             }
         }
 
         // Normal cast with cast time (attemptInitiateCast handles cooldown check internally)
-        boolean success = spell.attemptInitiateCast(
+        spell.attemptInitiateCast(
                 stack,
                 spellLevel,
                 player.level(),
@@ -112,11 +110,7 @@ public class ServerSpellCaster {
                 castingSlot
         );
 
-        if (!success) {
-            player.sendSystemMessage(Component.translatable("voicecastaddon.server.cast_failed"));
-        }
-
-        return success;
+        return true;
     }
 
     private static CastSource resolveCastSource(ItemStack stack) {
