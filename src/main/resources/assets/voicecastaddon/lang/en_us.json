@@ -13,7 +13,7 @@
   "voicecastaddon.message.no_content": "No content recognized",
   "voicecastaddon.message.matched": "Casting: %s",
   "voicecastaddon.message.unmatched": "No spell matched: %s",
-  "voicecastaddon.server.spell_not_found": "Spell not found or on cooldown",
+  "voicecastaddon.server.spell_not_found": "Spell not found",
   "voicecastaddon.command.list.title": "All Registered Spells",
   "voicecastaddon.command.list.count": "Found %s spells",
   "voicecastaddon.command.list.click_to_copy": "Click to copy spell ID",

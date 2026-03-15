@@ -13,7 +13,7 @@
   "voicecastaddon.message.no_content": "没有识别到内容",
   "voicecastaddon.message.matched": "施放法术: %s",
   "voicecastaddon.message.unmatched": "未匹配到法术: %s",
-  "voicecastaddon.server.spell_not_found": "未找到法术或法术正在冷却",
+  "voicecastaddon.server.spell_not_found": "未找到法术",
   "voicecastaddon.command.list.title": "所有已注册的法术",
   "voicecastaddon.command.list.count": "共找到 %s 个法术",
   "voicecastaddon.command.list.click_to_copy": "点击复制法术ID",
