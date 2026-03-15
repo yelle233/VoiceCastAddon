@@ -12,7 +12,7 @@ public class ServerPayloadHandler {
                 return;
             }
 
-            ServerSpellCaster.castByVoice(player, payload.spellId());
+            ServerSpellCaster.castByVoice(player, payload.spellId(), payload.skipCastTime(), payload.ignoreCooldown());
         }).exceptionally(ex -> {
             ex.printStackTrace();
             return null;

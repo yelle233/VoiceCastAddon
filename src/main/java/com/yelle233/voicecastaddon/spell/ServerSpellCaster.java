@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 public class ServerSpellCaster {
-    public static void castByVoice(ServerPlayer player, String spokenSpellIdString) {
+    public static void castByVoice(ServerPlayer player, String spokenSpellIdString, boolean skipCastTime, boolean ignoreCooldown) {
         ResourceLocation spokenSpellId;
         try {
             spokenSpellId = ResourceLocation.parse(spokenSpellIdString);
@@ -26,16 +26,16 @@ public class ServerSpellCaster {
             return;
         }
 
-        if (tryCastFromStack(player, player.getMainHandItem(), spokenSpellId, SpellSelectionManager.MAINHAND)) {
+        if (tryCastFromStack(player, player.getMainHandItem(), spokenSpellId, SpellSelectionManager.MAINHAND, skipCastTime, ignoreCooldown)) {
             return;
         }
 
-        if (tryCastFromStack(player, player.getOffhandItem(), spokenSpellId, SpellSelectionManager.OFFHAND)) {
+        if (tryCastFromStack(player, player.getOffhandItem(), spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown)) {
             return;
         }
 
         ItemStack equippedSpellbook = findEquippedSpellbook(player);
-        if (!equippedSpellbook.isEmpty() && tryCastFromStack(player, equippedSpellbook, spokenSpellId, SpellSelectionManager.OFFHAND)) {
+        if (!equippedSpellbook.isEmpty() && tryCastFromStack(player, equippedSpellbook, spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown)) {
             return;
         }
 
@@ -45,7 +45,9 @@ public class ServerSpellCaster {
     private static boolean tryCastFromStack(ServerPlayer player,
                                             ItemStack stack,
                                             ResourceLocation spokenSpellId,
-                                            String castingSlot) {
+                                            String castingSlot,
+                                            boolean skipCastTime,
+                                            boolean ignoreCooldown) {
         if (stack.isEmpty() || !ISpellContainer.isSpellContainer(stack)) {
             return false;
         }
@@ -66,7 +68,7 @@ public class ServerSpellCaster {
                 continue;
             }
 
-            return tryCastSpell(player, stack, spellData, castingSlot);
+            return tryCastSpell(player, stack, spellData, castingSlot, skipCastTime, ignoreCooldown);
         }
 
         return false;
@@ -75,11 +77,31 @@ public class ServerSpellCaster {
     private static boolean tryCastSpell(ServerPlayer player,
                                         ItemStack stack,
                                         SpellData spellData,
-                                        String castingSlot) {
+                                        String castingSlot,
+                                        boolean skipCastTime,
+                                        boolean ignoreCooldown) {
         var spell = spellData.getSpell();
         int spellLevel = spell.getLevelFor(spellData.getLevel(), player);
         CastSource castSource = resolveCastSource(stack);
 
+        if (skipCastTime && ignoreCooldown) {
+            // Skip cast time and cooldown: directly cast the spell
+            try {
+                spell.castSpell(
+                        player.level(),
+                        spellLevel,
+                        player,
+                        castSource,
+                        false
+                );
+                return true;
+            } catch (Exception e) {
+                // If direct cast fails, fallback to normal cast
+                player.sendSystemMessage(Component.translatable("voicecastaddon.server.instant_cast_failed"));
+            }
+        }
+
+        // Normal cast with cast time (attemptInitiateCast handles cooldown check internally)
         boolean success = spell.attemptInitiateCast(
                 stack,
                 spellLevel,

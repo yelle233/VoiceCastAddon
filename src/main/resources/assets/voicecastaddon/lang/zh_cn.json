@@ -16,6 +16,7 @@
   "voicecastaddon.server.invalid_spell_id": "非法法术ID: %s",
   "voicecastaddon.server.spell_not_found": "未拥有此法术或未装备法术容器",
   "voicecastaddon.server.cast_failed": "施法失败：可能在冷却中、蓝量不足或释放条件不满足",
+  "voicecastaddon.server.instant_cast_failed": "即时施法失败，尝试正常施法",
   "voicecastaddon.command.list.title": "所有已注册的法术",
   "voicecastaddon.command.list.count": "共找到 %s 个法术",
   "voicecastaddon.command.list.click_to_copy": "点击复制法术ID",
@@ -27,9 +28,5 @@
   "voicecastaddon.command.generate.reloaded": "配置已重新加载！",
   "voicecastaddon.command.generate.error": "生成配置失败: %s",
   "voicecastaddon.command.reload.success": "配置已重新加载！",
-  "voicecastaddon.command.reload.error": "重新加载配置失败: %s",
-  "voicecastaddon.config.recognition_mode": "识别模式",
-  "voicecastaddon.config.recognition_mode.offline": "离线模式（VOSK）",
-  "voicecastaddon.config.recognition_mode.online": "在线模式（腾讯云）",
-  "voicecastaddon.config.recognition_mode.hybrid": "混合模式（在线优先）"
+  "voicecastaddon.command.reload.error": "重新加载配置失败: %s"
 }

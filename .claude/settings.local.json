@@ -24,7 +24,12 @@
       "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep voice-models | head -20)",
       "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep \"vosk-model-small-en-us\" | head -10)",
       "WebSearch",
-      "Bash(./gradlew compileJava --console=plain 2>&1 | head -100)"
+      "Bash(./gradlew compileJava --console=plain 2>&1 | head -100)",
+      "Bash(find:*)",
+      "Bash(./gradlew compileJava --console=plain 2>&1 | grep -A 5 \"错误:\")",
+      "Bash(./gradlew compileJava --console=plain 2>&1 | head -50)",
+      "Bash(./gradlew compileJava --console=plain 2>&1 | head -30)",
+      "Bash(./gradlew compileJava --console=plain 2>&1 | head -20)"
     ]
   }
 }

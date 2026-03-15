@@ -28,6 +28,8 @@ public final class VoiceCastClientConfig {
     private static final String INPUT_DEVICE_KEY = "preferredInputDeviceId";
     private static final String RECOGNITION_MODE_KEY = "recognitionMode";
     private static final String ONLINE_PROVIDER_KEY = "onlineProvider";
+    private static final String SKIP_CAST_TIME_KEY = "skipCastTime";
+    private static final String IGNORE_COOLDOWN_KEY = "ignoreCooldown";
     private static final String TENCENT_SECRET_ID = "tencentSecretId";
     private static final String TENCENT_SECRET_KEY = "tencentSecretKey";
     private static final String BAIDU_API_KEY = "baiduApiKey";
@@ -43,7 +45,7 @@ public final class VoiceCastClientConfig {
     private static final String CONFIG_VERSION_KEY = "_config_version";
     private static final int CURRENT_CONFIG_VERSION = 1;
     private static final String SETTINGS_VERSION_KEY = "_settings_version";
-    private static final int CURRENT_SETTINGS_VERSION = 3; // Increment when settings schema changes
+    private static final int CURRENT_SETTINGS_VERSION = 5; // Increment when settings schema changes
 
     private VoiceCastClientConfig() {
     }
@@ -362,6 +364,8 @@ public final class VoiceCastClientConfig {
         root.addProperty(INPUT_DEVICE_KEY, "");
         root.addProperty(RECOGNITION_MODE_KEY, "offline"); // offline, online, hybrid
         root.addProperty(ONLINE_PROVIDER_KEY, "tencent"); // tencent, baidu, aliyun, xfyun
+        root.addProperty(SKIP_CAST_TIME_KEY, false); // Skip spell cast time for voice casting
+        root.addProperty(IGNORE_COOLDOWN_KEY, false); // Ignore spell cooldown for voice casting
 
         // Tencent Cloud credentials
         root.addProperty(TENCENT_SECRET_ID, "");
@@ -431,6 +435,34 @@ public final class VoiceCastClientConfig {
 
     public static String getXfyunApiSecret() {
         return getSettingString(XFYUN_API_SECRET, "");
+    }
+
+    public static boolean getSkipCastTime() {
+        ensureClientFiles();
+        try {
+            String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            if (root.has(SKIP_CAST_TIME_KEY)) {
+                return root.get(SKIP_CAST_TIME_KEY).getAsBoolean();
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to load skipCastTime setting", e);
+        }
+        return false;
+    }
+
+    public static boolean getIgnoreCooldown() {
+        ensureClientFiles();
+        try {
+            String json = Files.readString(getSettingsFile(), StandardCharsets.UTF_8);
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            if (root.has(IGNORE_COOLDOWN_KEY)) {
+                return root.get(IGNORE_COOLDOWN_KEY).getAsBoolean();
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to load ignoreCooldown setting", e);
+        }
+        return false;
     }
 
     public static int getLongSentenceThreshold() {

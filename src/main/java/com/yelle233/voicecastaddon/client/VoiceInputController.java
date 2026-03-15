@@ -73,7 +73,9 @@ public class VoiceInputController {
                         continue;
                     }
 
-                    PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
+                    boolean skipCastTime = VoiceCastClientConfig.getSkipCastTime();
+                    boolean ignoreCooldown = VoiceCastClientConfig.getIgnoreCooldown();
+                    PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString(), skipCastTime, ignoreCooldown));
                     Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
                     mc.player.displayClientMessage(
                             Component.translatable("voicecastaddon.message.matched", spellName),
