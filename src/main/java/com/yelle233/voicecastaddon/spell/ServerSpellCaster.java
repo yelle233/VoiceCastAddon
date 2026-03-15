@@ -1,5 +1,6 @@
 package com.yelle233.voicecastaddon.spell;
 
+import com.mojang.logging.LogUtils;
 import io.redspace.ironsspellbooks.api.item.ISpellbook;
 import io.redspace.ironsspellbooks.api.magic.SpellSelectionManager;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
@@ -11,12 +12,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import org.slf4j.Logger;
 
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.function.Predicate;
 
 public class ServerSpellCaster {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     public static void castByVoice(ServerPlayer player, String spokenSpellIdString, boolean skipCastTime, boolean ignoreCooldown, boolean ignoreMana) {
         ResourceLocation spokenSpellId;
         try {
@@ -25,19 +29,41 @@ public class ServerSpellCaster {
             return;
         }
 
-        if (tryCastFromStack(player, player.getMainHandItem(), spokenSpellId, SpellSelectionManager.MAINHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
+        LOGGER.debug("[VoiceCastAddon] Attempting to cast spell: {}", spokenSpellId);
+
+        ItemStack mainHand = player.getMainHandItem();
+        LOGGER.debug("[VoiceCastAddon] Main hand: {} (empty: {}, isSpellContainer: {})",
+            mainHand.getItem().getClass().getSimpleName(),
+            mainHand.isEmpty(),
+            !mainHand.isEmpty() && ISpellContainer.isSpellContainer(mainHand));
+
+        if (tryCastFromStack(player, mainHand, spokenSpellId, SpellSelectionManager.MAINHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
+            LOGGER.debug("[VoiceCastAddon] Cast from main hand");
             return;
         }
 
-        if (tryCastFromStack(player, player.getOffhandItem(), spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
+        ItemStack offHand = player.getOffhandItem();
+        LOGGER.debug("[VoiceCastAddon] Off hand: {} (empty: {}, isSpellContainer: {})",
+            offHand.getItem().getClass().getSimpleName(),
+            offHand.isEmpty(),
+            !offHand.isEmpty() && ISpellContainer.isSpellContainer(offHand));
+
+        if (tryCastFromStack(player, offHand, spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
+            LOGGER.debug("[VoiceCastAddon] Cast from off hand");
             return;
         }
 
         ItemStack equippedSpellbook = findEquippedSpellbook(player);
+        LOGGER.debug("[VoiceCastAddon] Equipped spellbook: {} (empty: {})",
+            equippedSpellbook.isEmpty() ? "none" : equippedSpellbook.getItem().getClass().getSimpleName(),
+            equippedSpellbook.isEmpty());
+
         if (!equippedSpellbook.isEmpty() && tryCastFromStack(player, equippedSpellbook, spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
+            LOGGER.debug("[VoiceCastAddon] Cast from equipped spellbook");
             return;
         }
 
+        LOGGER.debug("[VoiceCastAddon] Spell not found in any container");
         player.displayClientMessage(Component.translatable("voicecastaddon.server.spell_not_found"), true);
     }
 
@@ -52,22 +78,42 @@ public class ServerSpellCaster {
             return false;
         }
 
+        LOGGER.debug("[VoiceCastAddon] Checking stack: {}", stack.getItem().getClass().getSimpleName());
+
         ISpellContainer container = ISpellContainer.getOrCreate(stack);
-        for (SpellSlot spellSlot : container.getAllSpells()) {
-            if (spellSlot == null || spellSlot.isLocked()) {
+        SpellSlot[] allSpells = container.getAllSpells();
+        LOGGER.debug("[VoiceCastAddon] Container has {} spell slots", allSpells.length);
+
+        // Check if this is a scroll (scrolls have locked slots but should still be castable)
+        boolean isScroll = resolveCastSource(stack) == CastSource.SCROLL;
+
+        for (SpellSlot spellSlot : allSpells) {
+            if (spellSlot == null) {
+                LOGGER.debug("[VoiceCastAddon] Skipping null slot");
+                continue;
+            }
+
+            // For scrolls, ignore the locked status; for other items, skip locked slots
+            if (!isScroll && spellSlot.isLocked()) {
+                LOGGER.debug("[VoiceCastAddon] Skipping locked slot (not a scroll)");
                 continue;
             }
 
             SpellData spellData = spellSlot.spellData();
             if (spellData == null || spellData.getSpell() == null) {
+                LOGGER.debug("[VoiceCastAddon] Skipping slot with null spell data");
                 continue;
             }
 
             ResourceLocation actualSpellId = SpellRegistry.REGISTRY.getKey(spellData.getSpell());
+            LOGGER.debug("[VoiceCastAddon] Found spell: {} (looking for: {}, isLocked: {})",
+                actualSpellId, spokenSpellId, spellSlot.isLocked());
+
             if (actualSpellId == null || !actualSpellId.equals(spokenSpellId)) {
                 continue;
             }
 
+            LOGGER.debug("[VoiceCastAddon] Match found! Attempting to cast...");
             return tryCastSpell(player, stack, spellData, castingSlot, skipCastTime, ignoreCooldown, ignoreMana);
         }
 
