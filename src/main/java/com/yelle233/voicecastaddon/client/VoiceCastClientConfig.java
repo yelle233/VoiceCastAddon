@@ -45,7 +45,7 @@ public final class VoiceCastClientConfig {
     private static final String CONFIG_VERSION_KEY = "_config_version";
     private static final int CURRENT_CONFIG_VERSION = 1;
     private static final String SETTINGS_VERSION_KEY = "_settings_version";
-    private static final int CURRENT_SETTINGS_VERSION = 5; // Increment when settings schema changes
+    private static final int CURRENT_SETTINGS_VERSION = 1; // Increment when settings schema changes
 
     private VoiceCastClientConfig() {
     }
