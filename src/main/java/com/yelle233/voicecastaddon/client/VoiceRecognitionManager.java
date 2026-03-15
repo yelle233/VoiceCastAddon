@@ -4,7 +4,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import com.yelle233.voicecastaddon.client.online.OnlineSpeechRecognizer;
-import com.yelle233.voicecastaddon.client.online.TencentSpeechRecognizer;
+import com.yelle233.voicecastaddon.client.online.RecognizerConfig;
+import com.yelle233.voicecastaddon.client.online.RecognizerFactory;
+import com.yelle233.voicecastaddon.client.online.RecognizerProvider;
 import org.slf4j.Logger;
 import org.vosk.Model;
 import org.vosk.Recognizer;
@@ -196,16 +198,46 @@ public class VoiceRecognitionManager {
             return;
         }
 
-        String secretId = VoiceCastClientConfig.getTencentSecretId();
-        String secretKey = VoiceCastClientConfig.getTencentSecretKey();
+        try {
+            String providerName = VoiceCastClientConfig.getOnlineProvider();
+            RecognizerProvider provider = RecognizerProvider.fromId(providerName);
 
-        if (secretId.isBlank() || secretKey.isBlank()) {
-            LOGGER.warn("[VoiceCastAddon] Tencent API credentials not configured");
-            return;
+            RecognizerConfig config = buildRecognizerConfig(provider);
+            onlineRecognizer = RecognizerFactory.create(config);
+            LOGGER.info("[VoiceCastAddon] Initialized {} online recognizer", provider.getDisplayName());
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to initialize online recognizer: {}", e.getMessage());
+        }
+    }
+
+    private static RecognizerConfig buildRecognizerConfig(RecognizerProvider provider) {
+        RecognizerConfig.Builder builder = RecognizerConfig.builder(provider);
+
+        switch (provider) {
+            case TENCENT:
+                builder.credential("secretId", VoiceCastClientConfig.getTencentSecretId())
+                       .credential("secretKey", VoiceCastClientConfig.getTencentSecretKey());
+                break;
+
+            case BAIDU:
+                builder.credential("apiKey", VoiceCastClientConfig.getBaiduApiKey())
+                       .credential("secretKey", VoiceCastClientConfig.getBaiduSecretKey());
+                break;
+
+            case ALIYUN:
+                builder.credential("accessKeyId", VoiceCastClientConfig.getAliyunAccessKeyId())
+                       .credential("accessKeySecret", VoiceCastClientConfig.getAliyunAccessKeySecret())
+                       .credential("appKey", VoiceCastClientConfig.getAliyunAppKey());
+                break;
+
+            case XFYUN:
+                builder.credential("appId", VoiceCastClientConfig.getXfyunAppId())
+                       .credential("apiKey", VoiceCastClientConfig.getXfyunApiKey())
+                       .credential("apiSecret", VoiceCastClientConfig.getXfyunApiSecret());
+                break;
         }
 
-        onlineRecognizer = new TencentSpeechRecognizer(secretId, secretKey);
-        LOGGER.info("[VoiceCastAddon] Initialized Tencent online recognizer");
+        return builder.build();
     }
 
     public static boolean isListening() {

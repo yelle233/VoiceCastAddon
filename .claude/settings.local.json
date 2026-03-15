@@ -23,7 +23,8 @@
       "Bash(find src:*)",
       "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep voice-models | head -20)",
       "Bash(unzip -l build/libs/voicecastaddon-*.jar | grep \"vosk-model-small-en-us\" | head -10)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(./gradlew compileJava --console=plain 2>&1 | head -100)"
     ]
   }
 }

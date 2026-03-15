@@ -27,14 +27,23 @@ public final class VoiceCastClientConfig {
     private static final String CUSTOM_MODELS_DIR_NAME = "custom-voice-models";
     private static final String INPUT_DEVICE_KEY = "preferredInputDeviceId";
     private static final String RECOGNITION_MODE_KEY = "recognitionMode";
+    private static final String ONLINE_PROVIDER_KEY = "onlineProvider";
     private static final String TENCENT_SECRET_ID = "tencentSecretId";
     private static final String TENCENT_SECRET_KEY = "tencentSecretKey";
+    private static final String BAIDU_API_KEY = "baiduApiKey";
+    private static final String BAIDU_SECRET_KEY = "baiduSecretKey";
+    private static final String ALIYUN_ACCESS_KEY_ID = "aliyunAccessKeyId";
+    private static final String ALIYUN_ACCESS_KEY_SECRET = "aliyunAccessKeySecret";
+    private static final String ALIYUN_APP_KEY = "aliyunAppKey";
+    private static final String XFYUN_APP_ID = "xfyunAppId";
+    private static final String XFYUN_API_KEY = "xfyunApiKey";
+    private static final String XFYUN_API_SECRET = "xfyunApiSecret";
     private static final String LONG_SENTENCE_THRESHOLD_KEY = "longSentenceThreshold";
 
     private static final String CONFIG_VERSION_KEY = "_config_version";
     private static final int CURRENT_CONFIG_VERSION = 1;
     private static final String SETTINGS_VERSION_KEY = "_settings_version";
-    private static final int CURRENT_SETTINGS_VERSION = 2; // Increment when settings schema changes
+    private static final int CURRENT_SETTINGS_VERSION = 3; // Increment when settings schema changes
 
     private VoiceCastClientConfig() {
     }
@@ -352,8 +361,26 @@ public final class VoiceCastClientConfig {
         root.addProperty(SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION);
         root.addProperty(INPUT_DEVICE_KEY, "");
         root.addProperty(RECOGNITION_MODE_KEY, "offline"); // offline, online, hybrid
+        root.addProperty(ONLINE_PROVIDER_KEY, "tencent"); // tencent, baidu, aliyun, xfyun
+
+        // Tencent Cloud credentials
         root.addProperty(TENCENT_SECRET_ID, "");
         root.addProperty(TENCENT_SECRET_KEY, "");
+
+        // Baidu AI credentials
+        root.addProperty(BAIDU_API_KEY, "");
+        root.addProperty(BAIDU_SECRET_KEY, "");
+
+        // Aliyun credentials
+        root.addProperty(ALIYUN_ACCESS_KEY_ID, "");
+        root.addProperty(ALIYUN_ACCESS_KEY_SECRET, "");
+        root.addProperty(ALIYUN_APP_KEY, "");
+
+        // iFlytek credentials
+        root.addProperty(XFYUN_APP_ID, "");
+        root.addProperty(XFYUN_API_KEY, "");
+        root.addProperty(XFYUN_API_SECRET, "");
+
         root.addProperty(LONG_SENTENCE_THRESHOLD_KEY, 10);
         return root;
     }
@@ -362,12 +389,48 @@ public final class VoiceCastClientConfig {
         return getSettingString(RECOGNITION_MODE_KEY, "offline");
     }
 
+    public static String getOnlineProvider() {
+        return getSettingString(ONLINE_PROVIDER_KEY, "tencent");
+    }
+
     public static String getTencentSecretId() {
         return getSettingString(TENCENT_SECRET_ID, "");
     }
 
     public static String getTencentSecretKey() {
         return getSettingString(TENCENT_SECRET_KEY, "");
+    }
+
+    public static String getBaiduApiKey() {
+        return getSettingString(BAIDU_API_KEY, "");
+    }
+
+    public static String getBaiduSecretKey() {
+        return getSettingString(BAIDU_SECRET_KEY, "");
+    }
+
+    public static String getAliyunAccessKeyId() {
+        return getSettingString(ALIYUN_ACCESS_KEY_ID, "");
+    }
+
+    public static String getAliyunAccessKeySecret() {
+        return getSettingString(ALIYUN_ACCESS_KEY_SECRET, "");
+    }
+
+    public static String getAliyunAppKey() {
+        return getSettingString(ALIYUN_APP_KEY, "");
+    }
+
+    public static String getXfyunAppId() {
+        return getSettingString(XFYUN_APP_ID, "");
+    }
+
+    public static String getXfyunApiKey() {
+        return getSettingString(XFYUN_API_KEY, "");
+    }
+
+    public static String getXfyunApiSecret() {
+        return getSettingString(XFYUN_API_SECRET, "");
     }
 
     public static int getLongSentenceThreshold() {
