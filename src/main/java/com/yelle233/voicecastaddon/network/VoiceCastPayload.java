@@ -7,7 +7,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record VoiceCastPayload(String spellId, boolean skipCastTime, boolean ignoreCooldown) implements CustomPacketPayload {
+public record VoiceCastPayload(String spellId) implements CustomPacketPayload {
     public static final Type<VoiceCastPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(VoiceCastAddon.MODID, "voice_cast"));
 
@@ -15,10 +15,6 @@ public record VoiceCastPayload(String spellId, boolean skipCastTime, boolean ign
             StreamCodec.composite(
                     ByteBufCodecs.STRING_UTF8,
                     VoiceCastPayload::spellId,
-                    ByteBufCodecs.BOOL,
-                    VoiceCastPayload::skipCastTime,
-                    ByteBufCodecs.BOOL,
-                    VoiceCastPayload::ignoreCooldown,
                     VoiceCastPayload::new
             );
 
