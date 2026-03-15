@@ -195,7 +195,7 @@ A: 服务端管理员在 `config/voicecastaddon/server_settings.json` 中设置 
 3. 进入控制台 → 访问管理 → API密钥管理
 4. 创建密钥，获取 SecretId 和 SecretKey
 
-#### 百度AI（推荐）
+#### 百度AI
 1. 访问百度AI开放平台
 2. 注册并登录账号
 3. 创建语音识别应用
