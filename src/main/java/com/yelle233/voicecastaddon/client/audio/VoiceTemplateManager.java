@@ -108,29 +108,43 @@ public class VoiceTemplateManager {
         double[][] features = mfccExtractor.extractFeatures(audioBytes);
 
         if (features.length == 0) {
+            LOGGER.warn("[VoiceCastAddon] No features extracted from audio");
             return null;
         }
+
+        LOGGER.info("[VoiceCastAddon] Extracted {} frames from input audio", features.length);
 
         ResourceLocation bestMatch = null;
         double bestDistance = Double.MAX_VALUE;
 
         for (Map.Entry<ResourceLocation, List<double[][]>> entry : templates.entrySet()) {
+            double minDistanceForSpell = Double.MAX_VALUE;
+
             for (double[][] template : entry.getValue()) {
                 double distance = DtwMatcher.calculateDistance(features, template);
 
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestMatch = entry.getKey();
+                if (distance < minDistanceForSpell) {
+                    minDistanceForSpell = distance;
                 }
+            }
+
+            LOGGER.info("[VoiceCastAddon] Spell {} min distance: {}", entry.getKey(), minDistanceForSpell);
+
+            if (minDistanceForSpell < bestDistance) {
+                bestDistance = minDistanceForSpell;
+                bestMatch = entry.getKey();
             }
         }
 
+        LOGGER.info("[VoiceCastAddon] Best match: {} with distance {} (threshold: {})",
+                    bestMatch, bestDistance, threshold);
+
         if (bestDistance <= threshold) {
-            LOGGER.info("[VoiceCastAddon] Matched spell {} with distance {}", bestMatch, bestDistance);
+            LOGGER.info("[VoiceCastAddon] ✓ Matched spell {} with distance {}", bestMatch, bestDistance);
             return bestMatch;
         }
 
-        LOGGER.info("[VoiceCastAddon] No match found (best distance: {})", bestDistance);
+        LOGGER.warn("[VoiceCastAddon] ✗ No match found (best distance {} > threshold {})", bestDistance, threshold);
         return null;
     }
 

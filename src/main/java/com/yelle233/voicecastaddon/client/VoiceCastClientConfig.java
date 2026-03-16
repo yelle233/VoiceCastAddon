@@ -88,7 +88,7 @@ public final class VoiceCastClientConfig {
         } catch (Exception e) {
             LOGGER.error("[VoiceCastAddon] Failed to load match threshold", e);
         }
-        return 15.0;
+        return 50.0;
     }
 
     private static Path getConfigDir() {
@@ -163,7 +163,7 @@ public final class VoiceCastClientConfig {
         JsonObject root = new JsonObject();
         root.addProperty(SETTINGS_VERSION_KEY, CURRENT_SETTINGS_VERSION);
         root.addProperty(INPUT_DEVICE_KEY, "");
-        root.addProperty(MATCH_THRESHOLD_KEY, 15.0);
+        root.addProperty(MATCH_THRESHOLD_KEY, 50.0);
         return root;
     }
 }

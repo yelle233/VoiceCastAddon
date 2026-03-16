@@ -15,13 +15,16 @@ import java.util.List;
 public class VoiceTemplateRecordScreen extends Screen {
     private static final Component TITLE = Component.translatable("voicecastaddon.record.title");
     private static final Component RECORD_BUTTON = Component.translatable("voicecastaddon.record.record");
-    private static final Component STOP_RECORD_BUTTON = Component.literal("Stop");
+    private static final Component STOP_RECORD_BUTTON = Component.translatable("voicecastaddon.record.stop_record");
     private static final Component RECORDING = Component.translatable("voicecastaddon.record.recording");
     private static final Component DELETE_BUTTON = Component.translatable("voicecastaddon.record.delete");
     private static final Component BACK_BUTTON = Component.translatable("voicecastaddon.record.back");
     private static final Component TEST_BUTTON = Component.translatable("voicecastaddon.record.test");
-    private static final Component STOP_TEST_BUTTON = Component.literal("Stop");
+    private static final Component STOP_TEST_BUTTON = Component.translatable("voicecastaddon.record.stop_test");
     private static final Component TESTING = Component.translatable("voicecastaddon.record.testing");
+    private static final Component TEST_MATCHED = Component.translatable("voicecastaddon.record.test_matched");
+    private static final Component TEST_WRONG = Component.translatable("voicecastaddon.record.test_wrong");
+    private static final Component TEST_NO_MATCH = Component.translatable("voicecastaddon.record.test_no_match");
     private static final String TEMPLATE_MARKER = "[REC]";
 
     private final Screen parent;
@@ -29,11 +32,14 @@ public class VoiceTemplateRecordScreen extends Screen {
     private Button recordButton;
     private Button testButton;
     private Button deleteButton;
+    private Button backButton;
     private boolean isRecording = false;
     private boolean isTesting = false;
     private boolean isProcessing = false;
     private String statusMessage = "";
     private ResourceLocation activeSpellId;
+    private Component testResultMessage = Component.empty();
+    private int testResultColor = 0xFFFFFF;
 
     public VoiceTemplateRecordScreen(Screen parent) {
         super(TITLE);
@@ -70,7 +76,7 @@ public class VoiceTemplateRecordScreen extends Screen {
                 .bounds(centerX + 5, buttonY, 70, 20)
                 .build());
 
-        addRenderableWidget(Button.builder(BACK_BUTTON, b -> onClose())
+        backButton = addRenderableWidget(Button.builder(BACK_BUTTON, b -> onClose())
                 .bounds(centerX + 80, buttonY, 75, 20)
                 .build());
 
@@ -91,6 +97,7 @@ public class VoiceTemplateRecordScreen extends Screen {
         activeSpellId = spellList.getSelected().spellId;
         isRecording = true;
         statusMessage = "Recording... Click again to save";
+        testResultMessage = Component.empty();
         refreshActionButtons();
 
         if (!VoiceRecognitionManager.startListening()) {
@@ -138,6 +145,7 @@ public class VoiceTemplateRecordScreen extends Screen {
         activeSpellId = spellList.getSelected().spellId;
         isTesting = true;
         statusMessage = "Testing... Click again to match";
+        testResultMessage = Component.empty();
         refreshActionButtons();
 
         if (!VoiceRecognitionManager.startListening()) {
@@ -167,11 +175,17 @@ public class VoiceTemplateRecordScreen extends Screen {
                 if (matched != null) {
                     if (matched.equals(expectedSpell)) {
                         statusMessage = "Match SUCCESS: " + matched;
+                        testResultMessage = TEST_MATCHED;
+                        testResultColor = 0x55FF55;
                     } else {
                         statusMessage = "Match WRONG: got " + matched + ", expected " + expectedSpell;
+                        testResultMessage = TEST_WRONG;
+                        testResultColor = 0xFFD24D;
                     }
                 } else {
                     statusMessage = "No match found";
+                    testResultMessage = TEST_NO_MATCH;
+                    testResultColor = 0xFF6B6B;
                 }
                 isProcessing = false;
                 refreshActionButtons();
@@ -190,6 +204,7 @@ public class VoiceTemplateRecordScreen extends Screen {
         try {
             VoiceTemplateManager.deleteTemplates(spellList.getSelected().spellId);
             statusMessage = "Templates deleted";
+            testResultMessage = Component.empty();
             updateStatus();
         } catch (Exception e) {
             statusMessage = "Error: " + e.getMessage();
@@ -219,6 +234,10 @@ public class VoiceTemplateRecordScreen extends Screen {
         if (deleteButton != null) {
             deleteButton.active = !isRecording && !isTesting && !isProcessing;
         }
+
+        if (backButton != null) {
+            backButton.active = !isTesting && !isProcessing;
+        }
     }
 
     private List<ResourceLocation> loadAvailableSpells() {
@@ -241,16 +260,23 @@ public class VoiceTemplateRecordScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+
+        // 先渲染列表
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+
+        // 然后渲染文字（在最上层，不会被模糊）
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFF);
         guiGraphics.drawCenteredString(this.font, statusMessage, this.width / 2, this.height - 70, 0xFFFFFF);
+
+        if (!testResultMessage.getString().isEmpty()) {
+            guiGraphics.drawString(this.font, testResultMessage, this.width / 2 + 165, this.height - 50, testResultColor);
+        }
 
         if (isRecording) {
             guiGraphics.drawCenteredString(this.font, RECORDING, this.width / 2, this.height - 85, 0xFF0000);
         } else if (isTesting) {
             guiGraphics.drawCenteredString(this.font, TESTING, this.width / 2, this.height - 85, 0x00FF00);
         }
-
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     @Override
@@ -331,9 +357,13 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            if (isTesting || isProcessing) {
+                return false;
+            }
             if (button == 0) {
                 spellList.setSelected(this);
                 updateStatus();
+                testResultMessage = Component.empty();
                 return true;
             }
             return false;

@@ -87,7 +87,7 @@ public class ServerSpellCaster {
         LOGGER.debug("[VoiceCastAddon] Container has {} spell slots", allSpells.length);
 
         CastSource castSource = resolveCastSource(stack, container);
-        boolean isScroll = castSource == CastSource.SCROLL;
+        boolean ignoreLockedStatus = castSource == CastSource.SCROLL || castSource == CastSource.SWORD;
 
         for (SpellSlot spellSlot : allSpells) {
             if (spellSlot == null) {
@@ -95,9 +95,9 @@ public class ServerSpellCaster {
                 continue;
             }
 
-            // For scrolls, ignore the locked status; for other items, skip locked slots
-            if (!isScroll && spellSlot.isLocked()) {
-                LOGGER.debug("[VoiceCastAddon] Skipping locked slot (not a scroll)");
+            // For scrolls and imbued weapons, ignore the locked status
+            if (!ignoreLockedStatus && spellSlot.isLocked()) {
+                LOGGER.debug("[VoiceCastAddon] Skipping locked slot");
                 continue;
             }
 
