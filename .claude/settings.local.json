@@ -34,7 +34,9 @@
       "Bash(./gradlew jar:*)",
       "Bash(./gradlew runClient)",
       "Bash(ls:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(python3:*)",
+      "Bash(where java:*)"
     ]
   }
 }

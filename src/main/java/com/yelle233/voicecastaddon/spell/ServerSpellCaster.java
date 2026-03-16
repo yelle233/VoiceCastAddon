@@ -183,7 +183,15 @@ public class ServerSpellCaster {
                     return false;
                 }
 
+                // Initialize casting state before calling castSpell to ensure additionalCastData is properly set up
+                // This prevents NPE when OnClientCastPacket tries to deserialize castData on the client
+                magicData.initiateCast(spell, spellLevel, 0, castSource, castingSlot);
+                magicData.setPlayerCastingItem(stack);
+
                 spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreMana);
+
+                // Reset casting state immediately after cast
+                magicData.resetCastingState();
 
                 // Apply cooldown if not ignoring it
                 if (!ignoreCooldown) {
