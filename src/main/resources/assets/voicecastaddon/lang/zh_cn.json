@@ -15,7 +15,7 @@
   "voicecastaddon.message.no_match": "未匹配到法术",
   "voicecastaddon.record.title": "录制语音模板",
   "voicecastaddon.record.select_spell": "选择法术",
-  "voicecastaddon.record.record": "按住录音",
+  "voicecastaddon.record.record": "点击录音",
   "voicecastaddon.record.recording": "录音中...",
   "voicecastaddon.record.test": "测试匹配",
   "voicecastaddon.record.testing": "测试中...",

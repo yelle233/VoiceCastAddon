@@ -1,6 +1,7 @@
 package com.yelle233.voicecastaddon.spell;
 
 import com.mojang.logging.LogUtils;
+import io.redspace.ironsspellbooks.api.item.IScroll;
 import io.redspace.ironsspellbooks.api.item.ISpellbook;
 import io.redspace.ironsspellbooks.api.magic.SpellSelectionManager;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
@@ -12,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SwordItem;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Method;
@@ -84,8 +86,8 @@ public class ServerSpellCaster {
         SpellSlot[] allSpells = container.getAllSpells();
         LOGGER.debug("[VoiceCastAddon] Container has {} spell slots", allSpells.length);
 
-        // Check if this is a scroll (scrolls have locked slots but should still be castable)
-        boolean isScroll = resolveCastSource(stack) == CastSource.SCROLL;
+        CastSource castSource = resolveCastSource(stack, container);
+        boolean isScroll = castSource == CastSource.SCROLL;
 
         for (SpellSlot spellSlot : allSpells) {
             if (spellSlot == null) {
@@ -114,7 +116,7 @@ public class ServerSpellCaster {
             }
 
             LOGGER.debug("[VoiceCastAddon] Match found! Attempting to cast...");
-            return tryCastSpell(player, stack, spellData, castingSlot, skipCastTime, ignoreCooldown, ignoreMana);
+            return tryCastSpell(player, stack, spellData, castingSlot, castSource, skipCastTime, ignoreCooldown, ignoreMana);
         }
 
         return false;
@@ -124,12 +126,12 @@ public class ServerSpellCaster {
                                         ItemStack stack,
                                         SpellData spellData,
                                         String castingSlot,
+                                        CastSource castSource,
                                         boolean skipCastTime,
                                         boolean ignoreCooldown,
                                         boolean ignoreMana) {
         var spell = spellData.getSpell();
         int spellLevel = spell.getLevelFor(spellData.getLevel(), player);
-        CastSource castSource = resolveCastSource(stack);
 
         if (skipCastTime && ignoreCooldown) {
             // Skip cast time and cooldown: directly cast the spell
@@ -161,11 +163,37 @@ public class ServerSpellCaster {
         return true;
     }
 
-    private static CastSource resolveCastSource(ItemStack stack) {
+    private static CastSource resolveCastSource(ItemStack stack, ISpellContainer container) {
         if (stack.getItem() instanceof ISpellbook) {
             return CastSource.SPELLBOOK;
         }
-        return CastSource.SCROLL;
+        if (stack.getItem() instanceof IScroll) {
+            return CastSource.SCROLL;
+        }
+        if (stack.getItem() instanceof SwordItem) {
+            return CastSource.SWORD;
+        }
+        if (hasOnlyLockedSpells(container)) {
+            return CastSource.SCROLL;
+        }
+        return CastSource.SPELLBOOK;
+    }
+
+    private static boolean hasOnlyLockedSpells(ISpellContainer container) {
+        boolean sawSpell = false;
+
+        for (SpellSlot spellSlot : container.getAllSpells()) {
+            if (spellSlot == null || spellSlot.spellData() == null || spellSlot.spellData().getSpell() == null) {
+                continue;
+            }
+
+            sawSpell = true;
+            if (!spellSlot.isLocked()) {
+                return false;
+            }
+        }
+
+        return sawSpell;
     }
 
     private static ItemStack findEquippedSpellbook(ServerPlayer player) {

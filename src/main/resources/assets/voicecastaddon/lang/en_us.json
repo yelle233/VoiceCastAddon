@@ -15,7 +15,7 @@
   "voicecastaddon.message.no_match": "No spell matched",
   "voicecastaddon.record.title": "Record Voice Templates",
   "voicecastaddon.record.select_spell": "Select Spell",
-  "voicecastaddon.record.record": "Hold to Record",
+  "voicecastaddon.record.record": "Click to Record",
   "voicecastaddon.record.recording": "Recording...",
   "voicecastaddon.record.test": "Test Match",
   "voicecastaddon.record.testing": "Testing...",

@@ -15,17 +15,25 @@ import java.util.List;
 public class VoiceTemplateRecordScreen extends Screen {
     private static final Component TITLE = Component.translatable("voicecastaddon.record.title");
     private static final Component RECORD_BUTTON = Component.translatable("voicecastaddon.record.record");
+    private static final Component STOP_RECORD_BUTTON = Component.literal("Stop");
     private static final Component RECORDING = Component.translatable("voicecastaddon.record.recording");
     private static final Component DELETE_BUTTON = Component.translatable("voicecastaddon.record.delete");
     private static final Component BACK_BUTTON = Component.translatable("voicecastaddon.record.back");
     private static final Component TEST_BUTTON = Component.translatable("voicecastaddon.record.test");
+    private static final Component STOP_TEST_BUTTON = Component.literal("Stop");
     private static final Component TESTING = Component.translatable("voicecastaddon.record.testing");
+    private static final String TEMPLATE_MARKER = "[REC]";
 
     private final Screen parent;
     private SpellList spellList;
+    private Button recordButton;
+    private Button testButton;
+    private Button deleteButton;
     private boolean isRecording = false;
     private boolean isTesting = false;
+    private boolean isProcessing = false;
     private String statusMessage = "";
+    private ResourceLocation activeSpellId;
 
     public VoiceTemplateRecordScreen(Screen parent) {
         super(TITLE);
@@ -45,20 +53,20 @@ public class VoiceTemplateRecordScreen extends Screen {
         }
 
         spellList = new SpellList(this.minecraft, this.width, this.height - 96, 32, 24, availableSpells);
-        addWidget(spellList);
+        addRenderableWidget(spellList);
 
         int buttonY = this.height - 56;
         int centerX = this.width / 2;
 
-        addRenderableWidget(Button.builder(RECORD_BUTTON, b -> startRecording())
+        recordButton = addRenderableWidget(Button.builder(RECORD_BUTTON, b -> toggleRecording())
                 .bounds(centerX - 155, buttonY, 75, 20)
                 .build());
 
-        addRenderableWidget(Button.builder(TEST_BUTTON, b -> startTesting())
+        testButton = addRenderableWidget(Button.builder(TEST_BUTTON, b -> toggleTesting())
                 .bounds(centerX - 75, buttonY, 70, 20)
                 .build());
 
-        addRenderableWidget(Button.builder(DELETE_BUTTON, b -> deleteTemplates())
+        deleteButton = addRenderableWidget(Button.builder(DELETE_BUTTON, b -> deleteTemplates())
                 .bounds(centerX + 5, buttonY, 70, 20)
                 .build());
 
@@ -67,109 +75,107 @@ public class VoiceTemplateRecordScreen extends Screen {
                 .build());
 
         updateStatus();
+        refreshActionButtons();
     }
 
-    private void startRecording() {
-        if (isRecording || isTesting || spellList.getSelected() == null) {
+    private void toggleRecording() {
+        if (isRecording) {
+            finishRecording();
             return;
         }
 
+        if (isTesting || isProcessing || spellList == null || spellList.getSelected() == null) {
+            return;
+        }
+
+        activeSpellId = spellList.getSelected().spellId;
         isRecording = true;
-        statusMessage = "Recording... Release to save";
+        statusMessage = "Recording... Click again to save";
+        refreshActionButtons();
 
-        Thread recordThread = new Thread(() -> {
-            if (VoiceRecognitionManager.startListening()) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-
-                while (VoiceRecognitionManager.isListening()) {
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-
-                byte[] audioBytes = VoiceRecognitionManager.stopListeningAndGetAudio();
-
-                minecraft.execute(() -> {
-                    try {
-                        if (audioBytes.length > 0 && spellList.getSelected() != null) {
-                            VoiceTemplateManager.saveTemplate(spellList.getSelected().spellId, audioBytes);
-                            statusMessage = "Template saved successfully!";
-                        } else {
-                            statusMessage = "Recording failed: no audio captured";
-                        }
-                    } catch (Exception e) {
-                        statusMessage = "Error: " + e.getMessage();
-                    } finally {
-                        isRecording = false;
-                        updateStatus();
-                    }
-                });
-            } else {
-                minecraft.execute(() -> {
-                    statusMessage = "Failed to start recording";
-                    isRecording = false;
-                });
-            }
-        }, "voicecastaddon-record");
-
-        recordThread.setDaemon(true);
-        recordThread.start();
+        if (!VoiceRecognitionManager.startListening()) {
+            statusMessage = "Failed to start recording";
+            isRecording = false;
+            activeSpellId = null;
+            refreshActionButtons();
+        }
     }
 
-    private void startTesting() {
-        if (isRecording || isTesting || spellList.getSelected() == null) {
+    private void finishRecording() {
+        if (!isRecording) {
             return;
         }
 
-        ResourceLocation expectedSpell = spellList.getSelected().spellId;
+        ResourceLocation targetSpell = activeSpellId;
+        byte[] audioBytes = VoiceRecognitionManager.stopListeningAndGetAudio();
+
+        isRecording = false;
+        activeSpellId = null;
+        refreshActionButtons();
+
+        try {
+            if (audioBytes.length > 0 && targetSpell != null) {
+                VoiceTemplateManager.saveTemplate(targetSpell, audioBytes);
+                statusMessage = "Template saved successfully!";
+            } else {
+                statusMessage = "Recording failed: no audio captured";
+            }
+        } catch (Exception e) {
+            statusMessage = "Error: " + e.getMessage();
+        }
+    }
+
+    private void toggleTesting() {
+        if (isTesting) {
+            finishTesting();
+            return;
+        }
+
+        if (isRecording || isProcessing || spellList == null || spellList.getSelected() == null) {
+            return;
+        }
+
+        activeSpellId = spellList.getSelected().spellId;
         isTesting = true;
-        statusMessage = "Testing... Speak now";
+        statusMessage = "Testing... Click again to match";
+        refreshActionButtons();
+
+        if (!VoiceRecognitionManager.startListening()) {
+            statusMessage = "Failed to start testing";
+            isTesting = false;
+            activeSpellId = null;
+            refreshActionButtons();
+        }
+    }
+
+    private void finishTesting() {
+        if (!isTesting) {
+            return;
+        }
+
+        ResourceLocation expectedSpell = activeSpellId;
+        isTesting = false;
+        isProcessing = true;
+        activeSpellId = null;
+        statusMessage = "Processing test...";
+        refreshActionButtons();
 
         Thread testThread = new Thread(() -> {
-            if (VoiceRecognitionManager.startListening()) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+            ResourceLocation matched = VoiceRecognitionManager.stopListeningAndMatch();
 
-                while (VoiceRecognitionManager.isListening()) {
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-
-                ResourceLocation matched = VoiceRecognitionManager.stopListeningAndMatch();
-
-                minecraft.execute(() -> {
-                    if (matched != null) {
-                        if (matched.equals(expectedSpell)) {
-                            statusMessage = "Match SUCCESS: " + matched;
-                        } else {
-                            statusMessage = "Match WRONG: got " + matched + ", expected " + expectedSpell;
-                        }
+            minecraft.execute(() -> {
+                if (matched != null) {
+                    if (matched.equals(expectedSpell)) {
+                        statusMessage = "Match SUCCESS: " + matched;
                     } else {
-                        statusMessage = "No match found";
+                        statusMessage = "Match WRONG: got " + matched + ", expected " + expectedSpell;
                     }
-                    isTesting = false;
-                    updateStatus();
-                });
-            } else {
-                minecraft.execute(() -> {
-                    statusMessage = "Failed to start testing";
-                    isTesting = false;
-                });
-            }
+                } else {
+                    statusMessage = "No match found";
+                }
+                isProcessing = false;
+                refreshActionButtons();
+            });
         }, "voicecastaddon-test");
 
         testThread.setDaemon(true);
@@ -199,6 +205,22 @@ public class VoiceTemplateRecordScreen extends Screen {
         }
     }
 
+    private void refreshActionButtons() {
+        if (recordButton != null) {
+            recordButton.setMessage(isRecording ? STOP_RECORD_BUTTON : RECORD_BUTTON);
+            recordButton.active = !isTesting && !isProcessing;
+        }
+
+        if (testButton != null) {
+            testButton.setMessage(isTesting ? STOP_TEST_BUTTON : TEST_BUTTON);
+            testButton.active = !isRecording && !isProcessing;
+        }
+
+        if (deleteButton != null) {
+            deleteButton.active = !isRecording && !isTesting && !isProcessing;
+        }
+    }
+
     private List<ResourceLocation> loadAvailableSpells() {
         List<ResourceLocation> spells = new ArrayList<>();
         try {
@@ -219,11 +241,6 @@ public class VoiceTemplateRecordScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
-
-        if (spellList != null) {
-            spellList.render(guiGraphics, mouseX, mouseY, partialTick);
-        }
-
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFF);
         guiGraphics.drawCenteredString(this.font, statusMessage, this.width / 2, this.height - 70, 0xFFFFFF);
 
@@ -238,6 +255,14 @@ public class VoiceTemplateRecordScreen extends Screen {
 
     @Override
     public void onClose() {
+        if (VoiceRecognitionManager.isListening()) {
+            VoiceRecognitionManager.stopListeningAndGetAudio();
+        }
+        isRecording = false;
+        isTesting = false;
+        isProcessing = false;
+        activeSpellId = null;
+
         if (this.minecraft != null) {
             this.minecraft.setScreen(parent);
         }
@@ -253,7 +278,13 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         @Override
         protected void renderListBackground(GuiGraphics guiGraphics) {
-            guiGraphics.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xC0101010);
+            int left = this.getX();
+            int top = this.getY();
+            int right = left + this.width;
+            int bottom = top + this.height;
+
+            guiGraphics.fill(left - 1, top - 1, right + 1, bottom + 1, 0xFF6B5D46);
+            guiGraphics.fill(left, top, right, bottom, 0xF0201A14);
         }
 
         @Override
@@ -288,8 +319,13 @@ public class VoiceTemplateRecordScreen extends Screen {
 
             int sampleCount = VoiceTemplateManager.getSampleCount(spellId);
             String countText = sampleCount > 0 ? " (" + sampleCount + ")" : "";
+            int textLeft = left + 5;
+            if (sampleCount > 0) {
+                guiGraphics.drawString(font, TEMPLATE_MARKER, textLeft, top + 2, 0x55FF55);
+                textLeft += font.width(TEMPLATE_MARKER) + 4;
+            }
 
-            guiGraphics.drawString(font, displayName.getString() + countText, left + 5, top + 2, 0xFFFFFF);
+            guiGraphics.drawString(font, displayName.getString() + countText, textLeft, top + 2, 0xFFFFFF);
             guiGraphics.drawString(font, spellId.toString(), left + 5, top + 12, 0x808080);
         }
 
