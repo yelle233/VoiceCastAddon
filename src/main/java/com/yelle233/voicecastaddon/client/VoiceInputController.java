@@ -19,7 +19,12 @@ public class VoiceInputController {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
+        if (mc.player == null || mc.screen != null) {
+            // Don't process voice input when any GUI is open (including recording screen)
+            if (wasDown && VoiceRecognitionManager.isListening()) {
+                VoiceRecognitionManager.stopListeningAndGetAudio();
+            }
+            wasDown = false;
             return;
         }
 
@@ -52,28 +57,33 @@ public class VoiceInputController {
     }
 
     private static void processRecognition(Minecraft mc) {
-        ResourceLocation spellId = VoiceRecognitionManager.stopListeningAndMatch();
+        try {
+            ResourceLocation spellId = VoiceRecognitionManager.stopListeningAndMatch();
 
-        mc.execute(() -> {
-            try {
-                if (mc.player == null) {
-                    return;
+            mc.execute(() -> {
+                try {
+                    if (mc.player == null) {
+                        return;
+                    }
+
+                    if (spellId == null) {
+                        mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.no_match"), true);
+                        return;
+                    }
+
+                    PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
+                    Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
+                    mc.player.displayClientMessage(
+                            Component.translatable("voicecastaddon.message.matched", spellName),
+                            true
+                    );
+                } finally {
+                    recognitionInProgress = false;
                 }
-
-                if (spellId == null) {
-                    mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.no_match"), true);
-                    return;
-                }
-
-                PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
-                Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
-                mc.player.displayClientMessage(
-                        Component.translatable("voicecastaddon.message.matched", spellName),
-                        true
-                );
-            } finally {
-                recognitionInProgress = false;
-            }
-        });
+            });
+        } catch (Exception e) {
+            recognitionInProgress = false;
+            throw e;
+        }
     }
 }

@@ -3,17 +3,23 @@ package com.yelle233.voicecastaddon.spell;
 import com.mojang.logging.LogUtils;
 import io.redspace.ironsspellbooks.api.item.IScroll;
 import io.redspace.ironsspellbooks.api.item.ISpellbook;
+import io.redspace.ironsspellbooks.api.magic.MagicData;
 import io.redspace.ironsspellbooks.api.magic.SpellSelectionManager;
+import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import io.redspace.ironsspellbooks.api.registry.SpellRegistry;
 import io.redspace.ironsspellbooks.api.spells.CastSource;
+import io.redspace.ironsspellbooks.api.spells.CastResult;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
+import io.redspace.ironsspellbooks.capabilities.magic.CooldownInstance;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
+import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Method;
@@ -116,7 +122,10 @@ public class ServerSpellCaster {
             }
 
             LOGGER.debug("[VoiceCastAddon] Match found! Attempting to cast...");
-            return tryCastSpell(player, stack, spellData, castingSlot, castSource, skipCastTime, ignoreCooldown, ignoreMana);
+            tryCastSpell(player, stack, spellData, castingSlot, castSource, skipCastTime, ignoreCooldown, ignoreMana);
+            // Return true even if cast failed - we found the spell
+            // Error messages are shown by tryCastSpell
+            return true;
         }
 
         return false;
@@ -132,35 +141,95 @@ public class ServerSpellCaster {
                                         boolean ignoreMana) {
         var spell = spellData.getSpell();
         int spellLevel = spell.getLevelFor(spellData.getLevel(), player);
+        MagicData magicData = MagicData.getPlayerMagicData(player);
 
-        if (skipCastTime && ignoreCooldown) {
-            // Skip cast time and cooldown: directly cast the spell
-            try {
-                spell.castSpell(
-                        player.level(),
-                        spellLevel,
-                        player,
-                        castSource,
-                        !ignoreMana  // true = validate mana, false = ignore mana
-                );
-                return true;
-            } catch (Exception e) {
-                // If direct cast fails, fallback to normal cast
+        // Remove cooldown if ignoreCooldown is enabled
+        CooldownInstance savedCooldown = null;
+        if (ignoreCooldown) {
+            savedCooldown = magicData.getPlayerCooldowns().getSpellCooldowns().get(spell.getSpellId());
+            if (savedCooldown != null) {
+                magicData.getPlayerCooldowns().removeCooldown(spell.getSpellId());
+                magicData.getPlayerCooldowns().syncToPlayer(player);
             }
         }
 
-        // Normal cast with cast time (attemptInitiateCast handles cooldown check internally)
-        spell.attemptInitiateCast(
-                stack,
-                spellLevel,
-                player.level(),
-                player,
-                castSource,
-                !ignoreMana,  // true = validate mana, false = ignore mana
-                castingSlot
-        );
+        // Temporarily boost mana if ignoreMana is enabled
+        float originalMana = magicData.getMana();
+        if (ignoreMana && castSource.consumesMana() && !player.isCreative()) {
+            float requiredMana = spell.getManaCost(spellLevel);
+            if (originalMana < requiredMana) {
+                magicData.setMana(requiredMana);
+            }
+        }
 
-        return true;
+        try {
+            if (skipCastTime) {
+                // Direct cast without cast time
+                CastResult canCast = spell.canBeCastedBy(spellLevel, castSource, magicData, player);
+                if (!canCast.isSuccess()) {
+                    showCastResultMessage(player, canCast);
+                    restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, false, player);
+                    return false;
+                }
+
+                if (!spell.checkPreCastConditions(player.level(), spellLevel, player, magicData)) {
+                    restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, false, player);
+                    return false;
+                }
+
+                SpellPreCastEvent event = new SpellPreCastEvent(player, spell.getSpellId(), spellLevel, spell.getSchoolType(), castSource);
+                if (NeoForge.EVENT_BUS.post(event).isCanceled()) {
+                    restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, false, player);
+                    return false;
+                }
+
+                spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreMana);
+
+                // Apply cooldown if not ignoring it
+                if (!ignoreCooldown) {
+                    int cooldownTicks = spell.getSpellCooldown();
+                    magicData.getPlayerCooldowns().addCooldown(spell.getSpellId(), cooldownTicks, cooldownTicks);
+                    magicData.getPlayerCooldowns().syncToPlayer(player);
+                }
+
+                restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, true, player);
+                return true;
+            } else {
+                // Normal cast with cast time
+                boolean initiated = spell.attemptInitiateCast(stack, spellLevel, player.level(), player, castSource, !ignoreMana, castingSlot);
+                restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, initiated, player);
+                return initiated;
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Failed to cast spell", e);
+            restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, false, player);
+            return false;
+        }
+    }
+
+    private static void restoreState(MagicData magicData,
+                                     io.redspace.ironsspellbooks.api.spells.AbstractSpell spell,
+                                     CooldownInstance savedCooldown,
+                                     float originalMana,
+                                     boolean ignoreMana,
+                                     boolean castSucceeded,
+                                     ServerPlayer player) {
+        // Restore cooldown if it was removed and cast failed
+        if (savedCooldown != null && !castSucceeded) {
+            magicData.getPlayerCooldowns().addCooldown(spell.getSpellId(), savedCooldown.getSpellCooldown(), savedCooldown.getCooldownRemaining());
+            magicData.getPlayerCooldowns().syncToPlayer(player);
+        }
+
+        // Restore mana if it was boosted and cast failed
+        if (ignoreMana && !castSucceeded) {
+            magicData.setMana(originalMana);
+        }
+    }
+
+    private static void showCastResultMessage(ServerPlayer player, CastResult castResult) {
+        if (castResult.message != null) {
+            player.displayClientMessage(castResult.message, true);
+        }
     }
 
     private static CastSource resolveCastSource(ItemStack stack, ISpellContainer container) {

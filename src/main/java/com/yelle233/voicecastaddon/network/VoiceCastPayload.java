@@ -13,7 +13,7 @@ public record VoiceCastPayload(String spellId) implements CustomPacketPayload {
 
     public static final StreamCodec<ByteBuf, VoiceCastPayload> STREAM_CODEC =
             StreamCodec.composite(
-                    ByteBufCodecs.STRING_UTF8,
+                    ByteBufCodecs.stringUtf8(256),
                     VoiceCastPayload::spellId,
                     VoiceCastPayload::new
             );

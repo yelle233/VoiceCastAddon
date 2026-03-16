@@ -20,7 +20,9 @@ import java.io.ByteArrayOutputStream;
 public class VoiceRecognitionManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final float SAMPLE_RATE = 16000.0f;
+    private static final int MAX_RECORDING_SECONDS = 10;
 
+    private static final Object LOCK = new Object();
     private static TargetDataLine line;
     private static ByteArrayOutputStream audioBuffer;
     private static Thread captureThread;
@@ -29,64 +31,94 @@ public class VoiceRecognitionManager {
     private static volatile boolean initialized = false;
 
     public static boolean startListening() {
-        if (listening) {
-            return true;
+        synchronized (LOCK) {
+            if (listening) {
+                return true;
+            }
+
+            try {
+                ensureInitialized();
+
+                AudioFormat format = new AudioFormat(SAMPLE_RATE, 16, 1, true, false);
+                DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
+                Mixer preferredMixer = VoiceAudioDeviceManager.getPreferredMixer();
+                line = openTargetLine(preferredMixer, info, format);
+                line.start();
+
+                audioBuffer = new ByteArrayOutputStream();
+                listening = true;
+
+                captureThread = new Thread(() -> captureAudio(), "voicecastaddon-capture");
+                captureThread.setDaemon(true);
+                captureThread.start();
+
+                lastError = "";
+                LOGGER.info("[VoiceCastAddon] Voice capture started");
+                return true;
+            } catch (Throwable t) {
+                listening = false;
+                closeLine();
+                lastError = t.getMessage();
+                LOGGER.error("[VoiceCastAddon] Failed to start voice recognition", t);
+                return false;
+            }
         }
+    }
+
+    private static void captureAudio() {
+        byte[] buffer = new byte[4096];
+        int maxBytes = (int) (SAMPLE_RATE * 2 * MAX_RECORDING_SECONDS);
 
         try {
-            ensureInitialized();
-
-            AudioFormat format = new AudioFormat(SAMPLE_RATE, 16, 1, true, false);
-            DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-
-            Mixer preferredMixer = VoiceAudioDeviceManager.getPreferredMixer();
-            line = openTargetLine(preferredMixer, info, format);
-            line.start();
-
-            audioBuffer = new ByteArrayOutputStream();
-            listening = true;
-
-            captureThread = new Thread(() -> {
-                byte[] buffer = new byte[4096];
-                while (listening) {
-                    int count = line.read(buffer, 0, buffer.length);
-                    if (count > 0) {
-                        audioBuffer.write(buffer, 0, count);
+            while (listening && audioBuffer.size() < maxBytes) {
+                int count = line.read(buffer, 0, buffer.length);
+                if (count > 0) {
+                    synchronized (LOCK) {
+                        if (audioBuffer != null && listening) {
+                            audioBuffer.write(buffer, 0, count);
+                        }
                     }
                 }
-            }, "voicecastaddon-capture");
+            }
 
-            captureThread.setDaemon(true);
-            captureThread.start();
-            lastError = "";
-            LOGGER.info("[VoiceCastAddon] Voice capture started");
-            return true;
-        } catch (Throwable t) {
-            listening = false;
-            closeLine();
-            lastError = t.getMessage();
-            LOGGER.error("[VoiceCastAddon] Failed to start voice recognition", t);
-            return false;
+            if (audioBuffer.size() >= maxBytes) {
+                LOGGER.warn("[VoiceCastAddon] Recording reached maximum length ({}s)", MAX_RECORDING_SECONDS);
+            }
+        } catch (Exception e) {
+            LOGGER.error("[VoiceCastAddon] Error during audio capture", e);
         }
     }
 
     public static ResourceLocation stopListeningAndMatch() {
-        if (!listening) {
-            return null;
+        synchronized (LOCK) {
+            if (!listening) {
+                return null;
+            }
+
+            listening = false;
         }
 
-        listening = false;
         closeLine();
 
         if (captureThread != null) {
             try {
-                captureThread.join(500);
+                captureThread.join(1000);
+                if (captureThread.isAlive()) {
+                    LOGGER.warn("[VoiceCastAddon] Capture thread did not stop in time");
+                    captureThread.interrupt();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
 
-        byte[] audioBytes = audioBuffer != null ? audioBuffer.toByteArray() : new byte[0];
+        byte[] audioBytes;
+        synchronized (LOCK) {
+            audioBytes = audioBuffer != null ? audioBuffer.toByteArray() : new byte[0];
+            audioBuffer = null;
+        }
+
         if (audioBytes.length == 0) {
             return null;
         }
@@ -96,22 +128,33 @@ public class VoiceRecognitionManager {
     }
 
     public static byte[] stopListeningAndGetAudio() {
-        if (!listening) {
-            return new byte[0];
+        synchronized (LOCK) {
+            if (!listening) {
+                return new byte[0];
+            }
+
+            listening = false;
         }
 
-        listening = false;
         closeLine();
 
         if (captureThread != null) {
             try {
-                captureThread.join(500);
+                captureThread.join(1000);
+                if (captureThread.isAlive()) {
+                    LOGGER.warn("[VoiceCastAddon] Capture thread did not stop in time");
+                    captureThread.interrupt();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
 
-        return audioBuffer != null ? audioBuffer.toByteArray() : new byte[0];
+        synchronized (LOCK) {
+            byte[] result = audioBuffer != null ? audioBuffer.toByteArray() : new byte[0];
+            audioBuffer = null;
+            return result;
+        }
     }
 
     public static boolean isListening() {

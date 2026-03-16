@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 
 public final class VoiceCastServerConfig {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -21,6 +22,10 @@ public final class VoiceCastServerConfig {
     private static final String SKIP_CAST_TIME_KEY = "skipCastTime";
     private static final String IGNORE_COOLDOWN_KEY = "ignoreCooldown";
     private static final String IGNORE_MANA_KEY = "ignoreManaRequirement";
+
+    // Cache
+    private static volatile ConfigCache cache = null;
+    private static final Object CACHE_LOCK = new Object();
 
     private VoiceCastServerConfig() {
     }
@@ -38,45 +43,49 @@ public final class VoiceCastServerConfig {
     }
 
     public static boolean getSkipCastTime() {
-        ensureServerFiles();
-        try {
-            String json = Files.readString(getServerSettingsFile(), StandardCharsets.UTF_8);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            if (root.has(SKIP_CAST_TIME_KEY)) {
-                return root.get(SKIP_CAST_TIME_KEY).getAsBoolean();
-            }
-        } catch (Exception e) {
-            LOGGER.error("[VoiceCastAddon] Failed to load skipCastTime setting", e);
-        }
-        return false;
+        return getConfig().skipCastTime;
     }
 
     public static boolean getIgnoreCooldown() {
-        ensureServerFiles();
-        try {
-            String json = Files.readString(getServerSettingsFile(), StandardCharsets.UTF_8);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            if (root.has(IGNORE_COOLDOWN_KEY)) {
-                return root.get(IGNORE_COOLDOWN_KEY).getAsBoolean();
-            }
-        } catch (Exception e) {
-            LOGGER.error("[VoiceCastAddon] Failed to load ignoreCooldown setting", e);
-        }
-        return false;
+        return getConfig().ignoreCooldown;
     }
 
     public static boolean getIgnoreManaRequirement() {
-        ensureServerFiles();
+        return getConfig().ignoreManaRequirement;
+    }
+
+    private static ConfigCache getConfig() {
+        ConfigCache current = cache;
+        Path settingsFile = getServerSettingsFile();
+
         try {
-            String json = Files.readString(getServerSettingsFile(), StandardCharsets.UTF_8);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            if (root.has(IGNORE_MANA_KEY)) {
-                return root.get(IGNORE_MANA_KEY).getAsBoolean();
+            FileTime lastModified = Files.getLastModifiedTime(settingsFile);
+
+            if (current != null && current.lastModified.equals(lastModified)) {
+                return current;
+            }
+
+            synchronized (CACHE_LOCK) {
+                current = cache;
+                if (current != null && current.lastModified.equals(lastModified)) {
+                    return current;
+                }
+
+                ensureServerFiles();
+                String json = Files.readString(settingsFile, StandardCharsets.UTF_8);
+                JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+
+                boolean skipCastTime = root.has(SKIP_CAST_TIME_KEY) && root.get(SKIP_CAST_TIME_KEY).getAsBoolean();
+                boolean ignoreCooldown = root.has(IGNORE_COOLDOWN_KEY) && root.get(IGNORE_COOLDOWN_KEY).getAsBoolean();
+                boolean ignoreMana = root.has(IGNORE_MANA_KEY) && root.get(IGNORE_MANA_KEY).getAsBoolean();
+
+                cache = new ConfigCache(skipCastTime, ignoreCooldown, ignoreMana, lastModified);
+                return cache;
             }
         } catch (Exception e) {
-            LOGGER.error("[VoiceCastAddon] Failed to load ignoreManaRequirement setting", e);
+            LOGGER.error("[VoiceCastAddon] Failed to load server config, using defaults", e);
+            return new ConfigCache(false, false, false, null);
         }
-        return false;
     }
 
     private static Path getConfigDir() {
@@ -96,5 +105,8 @@ public final class VoiceCastServerConfig {
 
         Files.writeString(getServerSettingsFile(), GSON.toJson(root), StandardCharsets.UTF_8);
         LOGGER.info("[VoiceCastAddon] Created default server settings file");
+    }
+
+    private record ConfigCache(boolean skipCastTime, boolean ignoreCooldown, boolean ignoreManaRequirement, FileTime lastModified) {
     }
 }
