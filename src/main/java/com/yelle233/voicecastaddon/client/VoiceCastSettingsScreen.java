@@ -12,10 +12,10 @@ public class VoiceCastSettingsScreen extends Screen {
     private static final Component TITLE = Component.translatable("voicecastaddon.settings.title");
     private static final Component DEVICE_LABEL = Component.translatable("voicecastaddon.settings.device_label");
     private static final Component REFRESH_LABEL = Component.translatable("voicecastaddon.settings.refresh");
+    private static final Component RECORD_LABEL = Component.translatable("voicecastaddon.settings.record");
     private static final Component SAVE_LABEL = Component.translatable("voicecastaddon.settings.save");
     private static final Component BACK_LABEL = Component.translatable("voicecastaddon.settings.back");
-    private static final Component NOTE_1 = Component.translatable("voicecastaddon.settings.note1");
-    private static final Component NOTE_2 = Component.translatable("voicecastaddon.settings.note2");
+    private static final Component NOTE = Component.translatable("voicecastaddon.settings.note_record");
 
     private final Screen parent;
     private List<VoiceAudioDeviceManager.AudioInputDevice> devices = List.of();
@@ -37,7 +37,7 @@ public class VoiceCastSettingsScreen extends Screen {
         selectedDevice = resolveSelectedDevice();
 
         int centerX = this.width / 2;
-        int startY = this.height / 2 - 40;
+        int startY = this.height / 2 - 60;
 
         addRenderableWidget(CycleButton.<VoiceAudioDeviceManager.AudioInputDevice>builder(device ->
                         Component.literal(device.displayName()))
@@ -50,14 +50,21 @@ public class VoiceCastSettingsScreen extends Screen {
                 .bounds(centerX - 150, startY + 30, 300, 20)
                 .build());
 
+        addRenderableWidget(Button.builder(RECORD_LABEL, button -> {
+                    if (this.minecraft != null) {
+                        this.minecraft.setScreen(new VoiceTemplateRecordScreen(this));
+                    }
+                }).bounds(centerX - 150, startY + 60, 300, 20)
+                .build());
+
         addRenderableWidget(Button.builder(SAVE_LABEL, button -> {
                     VoiceCastClientConfig.setPreferredInputDeviceId(selectedDevice.id());
                     onClose();
-                }).bounds(centerX - 150, startY + 70, 145, 20)
+                }).bounds(centerX - 150, startY + 100, 145, 20)
                 .build());
 
         addRenderableWidget(Button.builder(BACK_LABEL, button -> onClose())
-                .bounds(centerX + 5, startY + 70, 145, 20)
+                .bounds(centerX + 5, startY + 100, 145, 20)
                 .build());
     }
 
@@ -73,8 +80,7 @@ public class VoiceCastSettingsScreen extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 40, 0xFFFFFF);
-        guiGraphics.drawCenteredString(this.font, NOTE_1, this.width / 2, this.height / 2 + 40, 0xA0A0A0);
-        guiGraphics.drawCenteredString(this.font, NOTE_2, this.width / 2, this.height / 2 + 55, 0xA0A0A0);
+        guiGraphics.drawCenteredString(this.font, NOTE, this.width / 2, this.height / 2 + 50, 0xA0A0A0);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 

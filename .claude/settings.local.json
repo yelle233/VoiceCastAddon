@@ -32,7 +32,9 @@
       "Bash(./gradlew compileJava --console=plain 2>&1 | head -20)",
       "Bash(./gradlew clean:*)",
       "Bash(./gradlew jar:*)",
-      "Bash(./gradlew runClient)"
+      "Bash(./gradlew runClient)",
+      "Bash(ls:*)",
+      "Bash(cd:*)"
     ]
   }
 }

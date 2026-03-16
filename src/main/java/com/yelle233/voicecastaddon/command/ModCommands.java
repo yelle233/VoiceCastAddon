@@ -12,7 +12,5 @@ public class ModCommands {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterClientCommandsEvent event) {
         ListSpellsCommand.register(event.getDispatcher());
-        GenerateConfigCommand.register(event.getDispatcher());
-        ReloadConfigCommand.register(event.getDispatcher());
     }
 }

@@ -11,8 +11,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-import java.util.List;
-
 @EventBusSubscriber(modid = VoiceCastAddon.MODID, value = Dist.CLIENT)
 public class VoiceInputController {
     private static boolean wasDown = false;
@@ -54,7 +52,7 @@ public class VoiceInputController {
     }
 
     private static void processRecognition(Minecraft mc) {
-        List<String> recognizedTexts = VoiceRecognitionManager.stopListeningAndRecognizeCandidates();
+        ResourceLocation spellId = VoiceRecognitionManager.stopListeningAndMatch();
 
         mc.execute(() -> {
             try {
@@ -62,28 +60,15 @@ public class VoiceInputController {
                     return;
                 }
 
-                if (recognizedTexts.isEmpty()) {
-                    mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.no_content"), true);
+                if (spellId == null) {
+                    mc.player.displayClientMessage(Component.translatable("voicecastaddon.message.no_match"), true);
                     return;
                 }
 
-                for (String recognizedText : recognizedTexts) {
-                    ResourceLocation spellId = VoiceSpellAliases.match(recognizedText);
-                    if (spellId == null) {
-                        continue;
-                    }
-
-                    PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
-                    Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
-                    mc.player.displayClientMessage(
-                            Component.translatable("voicecastaddon.message.matched", spellName),
-                            true
-                    );
-                    return;
-                }
-
+                PacketDistributor.sendToServer(new VoiceCastPayload(spellId.toString()));
+                Component spellName = SpellNameHelper.getSpellDisplayName(spellId);
                 mc.player.displayClientMessage(
-                        Component.translatable("voicecastaddon.message.unmatched", String.join(" / ", recognizedTexts)),
+                        Component.translatable("voicecastaddon.message.matched", spellName),
                         true
                 );
             } finally {

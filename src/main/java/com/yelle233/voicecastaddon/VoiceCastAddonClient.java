@@ -11,9 +11,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
-// This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = VoiceCastAddon.MODID, dist = Dist.CLIENT)
-// You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
 @EventBusSubscriber(modid = VoiceCastAddon.MODID, value = Dist.CLIENT)
 public class VoiceCastAddonClient {
     public VoiceCastAddonClient(ModContainer container) {
@@ -23,10 +21,7 @@ public class VoiceCastAddonClient {
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
-        System.setProperty("jna.encoding", "UTF-8");
         VoiceCastClientConfig.ensureClientFiles();
-
-        // 立即在主线程上开始加载模型，不要延迟
-        VoiceRecognitionManager.warmUpSync();
+        VoiceRecognitionManager.initialize();
     }
 }
