@@ -36,7 +36,6 @@ public class VoiceTemplateRecordScreen extends Screen {
     private boolean isRecording = false;
     private boolean isTesting = false;
     private boolean isProcessing = false;
-    private String statusMessage = "";
     private ResourceLocation activeSpellId;
     private Component testResultMessage = Component.empty();
     private int testResultColor = 0xFFFFFF;
@@ -51,7 +50,6 @@ public class VoiceTemplateRecordScreen extends Screen {
         List<ResourceLocation> availableSpells = loadAvailableSpells();
 
         if (availableSpells.isEmpty()) {
-            statusMessage = "No spells available. Use /voicecast list to see available spells.";
             addRenderableWidget(Button.builder(BACK_BUTTON, b -> onClose())
                     .bounds(this.width / 2 - 75, this.height / 2, 150, 20)
                     .build());
@@ -80,7 +78,6 @@ public class VoiceTemplateRecordScreen extends Screen {
                 .bounds(centerX + 80, buttonY, 75, 20)
                 .build());
 
-        updateStatus();
         refreshActionButtons();
     }
 
@@ -96,12 +93,10 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         activeSpellId = spellList.getSelected().spellId;
         isRecording = true;
-        statusMessage = "Recording... Click again to save";
         testResultMessage = Component.empty();
         refreshActionButtons();
 
         if (!VoiceRecognitionManager.startListening()) {
-            statusMessage = "Failed to start recording";
             isRecording = false;
             activeSpellId = null;
             refreshActionButtons();
@@ -123,12 +118,9 @@ public class VoiceTemplateRecordScreen extends Screen {
         try {
             if (audioBytes.length > 0 && targetSpell != null) {
                 VoiceTemplateManager.saveTemplate(targetSpell, audioBytes);
-                statusMessage = "Template saved successfully!";
-            } else {
-                statusMessage = "Recording failed: no audio captured";
             }
         } catch (Exception e) {
-            statusMessage = "Error: " + e.getMessage();
+            // Silently fail
         }
     }
 
@@ -144,12 +136,10 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         activeSpellId = spellList.getSelected().spellId;
         isTesting = true;
-        statusMessage = "Testing... Click again to match";
         testResultMessage = Component.empty();
         refreshActionButtons();
 
         if (!VoiceRecognitionManager.startListening()) {
-            statusMessage = "Failed to start testing";
             isTesting = false;
             activeSpellId = null;
             refreshActionButtons();
@@ -165,7 +155,6 @@ public class VoiceTemplateRecordScreen extends Screen {
         isTesting = false;
         isProcessing = true;
         activeSpellId = null;
-        statusMessage = "Processing test...";
         refreshActionButtons();
 
         Thread testThread = new Thread(() -> {
@@ -174,16 +163,13 @@ public class VoiceTemplateRecordScreen extends Screen {
             minecraft.execute(() -> {
                 if (matched != null) {
                     if (matched.equals(expectedSpell)) {
-                        statusMessage = "Match SUCCESS: " + matched;
                         testResultMessage = TEST_MATCHED;
                         testResultColor = 0x55FF55;
                     } else {
-                        statusMessage = "Match WRONG: got " + matched + ", expected " + expectedSpell;
                         testResultMessage = TEST_WRONG;
                         testResultColor = 0xFFD24D;
                     }
                 } else {
-                    statusMessage = "No match found";
                     testResultMessage = TEST_NO_MATCH;
                     testResultColor = 0xFF6B6B;
                 }
@@ -203,20 +189,9 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         try {
             VoiceTemplateManager.deleteTemplates(spellList.getSelected().spellId);
-            statusMessage = "Templates deleted";
             testResultMessage = Component.empty();
-            updateStatus();
         } catch (Exception e) {
-            statusMessage = "Error: " + e.getMessage();
-        }
-    }
-
-    private void updateStatus() {
-        if (spellList != null && spellList.getSelected() != null) {
-            int count = VoiceTemplateManager.getSampleCount(spellList.getSelected().spellId);
-            if (statusMessage.isEmpty() || statusMessage.startsWith("Samples:")) {
-                statusMessage = "Samples: " + count;
-            }
+            // Silently fail
         }
     }
 
@@ -266,7 +241,6 @@ public class VoiceTemplateRecordScreen extends Screen {
 
         // 然后渲染文字（在最上层，不会被模糊）
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFF);
-        guiGraphics.drawCenteredString(this.font, statusMessage, this.width / 2, this.height - 70, 0xFFFFFF);
 
         if (!testResultMessage.getString().isEmpty()) {
             guiGraphics.drawString(this.font, testResultMessage, this.width / 2 + 165, this.height - 50, testResultColor);
@@ -362,7 +336,6 @@ public class VoiceTemplateRecordScreen extends Screen {
             }
             if (button == 0) {
                 spellList.setSelected(this);
-                updateStatus();
                 testResultMessage = Component.empty();
                 return true;
             }
