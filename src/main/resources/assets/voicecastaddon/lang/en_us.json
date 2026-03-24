@@ -1,6 +1,7 @@
 {
   "key.categories.voicecastaddon": "Voice Cast Addon",
   "key.voicecastaddon.voice_cast": "Hold to Voice Cast",
+  "key.voicecastaddon.open_settings": "Open Voice Cast Settings",
   "voicecastaddon.settings.title": "Voice Cast Addon",
   "voicecastaddon.settings.device_label": "Voice Input Device",
   "voicecastaddon.settings.refresh": "Refresh Device List",

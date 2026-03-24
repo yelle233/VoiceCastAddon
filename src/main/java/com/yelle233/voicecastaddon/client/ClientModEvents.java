@@ -16,5 +16,6 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(ClientKeyMappings.VOICE_CAST_KEY);
+        event.register(ClientKeyMappings.OPEN_SETTINGS_KEY);
     }
 }

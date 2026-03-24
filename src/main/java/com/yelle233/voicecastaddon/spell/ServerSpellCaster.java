@@ -12,6 +12,7 @@ import io.redspace.ironsspellbooks.api.spells.CastResult;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
+import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.capabilities.magic.CooldownInstance;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -163,8 +164,12 @@ public class ServerSpellCaster {
         }
 
         try {
-            if (skipCastTime) {
-                // Direct cast without cast time
+            // Check if this is a continuous cast spell (like Dragon Breath)
+            // Continuous cast spells need the casting animation to work properly
+            boolean isContinuousCast = isContinuousCastSpell(spell);
+
+            if (skipCastTime && !isContinuousCast) {
+                // Direct cast without cast time (only for non-continuous spells)
                 CastResult canCast = spell.canBeCastedBy(spellLevel, castSource, magicData, player);
                 if (!canCast.isSuccess()) {
                     showCastResultMessage(player, canCast);
@@ -195,7 +200,8 @@ public class ServerSpellCaster {
 
                 // Apply cooldown if not ignoring it
                 if (!ignoreCooldown) {
-                    int cooldownTicks = spell.getSpellCooldown();
+                    int baseCooldown = spell.getSpellCooldown();
+                    int cooldownTicks = Utils.applyCooldownReduction(baseCooldown, player);
                     magicData.getPlayerCooldowns().addCooldown(spell.getSpellId(), cooldownTicks, cooldownTicks);
                     magicData.getPlayerCooldowns().syncToPlayer(player);
                 }
@@ -203,7 +209,7 @@ public class ServerSpellCaster {
                 restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, true, player);
                 return true;
             } else {
-                // Normal cast with cast time
+                // Normal cast with cast time (for continuous spells or when skipCastTime is false)
                 boolean initiated = spell.attemptInitiateCast(stack, spellLevel, player.level(), player, castSource, !ignoreMana, castingSlot);
                 restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, initiated, player);
                 return initiated;
@@ -271,6 +277,27 @@ public class ServerSpellCaster {
         }
 
         return sawSpell;
+    }
+
+    /**
+     * Check if a spell is a continuous cast spell (like Dragon Breath).
+     * Continuous cast spells need the casting animation to work properly.
+     */
+    private static boolean isContinuousCastSpell(io.redspace.ironsspellbooks.api.spells.AbstractSpell spell) {
+        try {
+            // Try to call getCastDuration() method via reflection
+            // Continuous cast spells have a cast duration > 0
+            Method getCastDuration = spell.getClass().getMethod("getCastDuration");
+            Object result = getCastDuration.invoke(spell);
+            if (result instanceof Integer duration) {
+                return duration > 0;
+            }
+        } catch (Exception e) {
+            // Method doesn't exist or failed to invoke, assume it's not a continuous cast spell
+            LOGGER.debug("[VoiceCastAddon] Could not check getCastDuration for spell {}: {}",
+                spell.getSpellId(), e.getMessage());
+        }
+        return false;
     }
 
     private static ItemStack findEquippedSpellbook(ServerPlayer player) {

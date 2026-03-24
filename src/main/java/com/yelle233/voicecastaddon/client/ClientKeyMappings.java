@@ -11,6 +11,12 @@ public class ClientKeyMappings {
             "key.categories." + VoiceCastAddon.MODID
     );
 
+    public static final KeyMapping OPEN_SETTINGS_KEY = new KeyMapping(
+            "key." + VoiceCastAddon.MODID + ".open_settings",
+            GLFW.GLFW_KEY_UNKNOWN,  // No default binding
+            "key.categories." + VoiceCastAddon.MODID
+    );
+
     private ClientKeyMappings() {
     }
 }

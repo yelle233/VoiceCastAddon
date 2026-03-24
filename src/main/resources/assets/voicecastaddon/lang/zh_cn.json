@@ -1,6 +1,7 @@
 {
   "key.categories.voicecastaddon": "语音施法附属",
   "key.voicecastaddon.voice_cast": "按住以语音施法",
+  "key.voicecastaddon.open_settings": "打开语音施法设置",
   "voicecastaddon.settings.title": "语音施法附属",
   "voicecastaddon.settings.device_label": "语音输入设备",
   "voicecastaddon.settings.refresh": "刷新设备列表",

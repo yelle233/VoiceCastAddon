@@ -36,7 +36,26 @@
       "Bash(ls:*)",
       "Bash(cd:*)",
       "Bash(python3:*)",
-      "Bash(where java:*)"
+      "Bash(where java:*)",
+      "Bash(./gradlew dependencies:*)",
+      "WebFetch(domain:www.iron.wiki)",
+      "WebFetch(domain:github.com)",
+      "Bash(./gradlew --stop)",
+      "Bash(./gradlew downloadAssets --refresh-dependencies)",
+      "Bash(./gradlew idea:*)",
+      "Bash(unzip -l \"/c/Users/Yelle233/.gradle/caches/modules-2/files-2.1/curse.maven/irons-spells-n-spellbooks-855414/7691161/4313d2a9eb68a30e1994b339acacf5bb1d53250e/irons-spells-n-spellbooks-855414-7691161.jar\")",
+      "Bash(cd /tmp)",
+      "Bash(unzip -q /c/Users/Yelle233/.gradle/caches/modules-2/files-2.1/curse.maven/irons-spells-n-spellbooks-855414/7691161/4313d2a9eb68a30e1994b339acacf5bb1d53250e/irons-spells-n-spellbooks-855414-7691161.jar io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(javap -c -p io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(javap -p io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(unzip -o /c/Users/Yelle233/.gradle/caches/modules-2/files-2.1/curse.maven/irons-spells-n-spellbooks-855414/7691161/4313d2a9eb68a30e1994b339acacf5bb1d53250e/irons-spells-n-spellbooks-855414-7691161.jar io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash($JAVA_HOME/bin/javap -p io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(jar -tf \"/c/Users/Yelle233/.gradle/caches/modules-2/files-2.1/curse.maven/irons-spells-n-spellbooks-855414/7691161/4313d2a9eb68a30e1994b339acacf5bb1d53250e/irons-spells-n-spellbooks-855414-7691161.jar\")",
+      "Bash(./gradlew --version)",
+      "Bash('/c/Program Files/Java/jdk-21/bin/javap' -p io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(\"/c/Program Files/Java/jdk-21/bin/javap\" -p /tmp/io/redspace/ironsspellbooks/api/spells/AbstractSpell.class)",
+      "Bash(unzip -o /c/Users/Yelle233/.gradle/caches/modules-2/files-2.1/curse.maven/irons-spells-n-spellbooks-855414/7691161/4313d2a9eb68a30e1994b339acacf5bb1d53250e/irons-spells-n-spellbooks-855414-7691161.jar io/redspace/ironsspellbooks/capabilities/magic/CooldownInstance.class)",
+      "Bash('/c/Program Files/Java/jdk-21/bin/javap' -p io/redspace/ironsspellbooks/capabilities/magic/CooldownInstance.class)"
     ]
   }
 }
