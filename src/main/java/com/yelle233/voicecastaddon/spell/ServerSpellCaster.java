@@ -168,6 +168,10 @@ public class ServerSpellCaster {
             // Continuous cast spells need the casting animation to work properly
             boolean isContinuousCast = isContinuousCastSpell(spell);
 
+            LOGGER.info("[VoiceCastAddon] === Cast decision for {} ===", spell.getSpellId());
+            LOGGER.info("[VoiceCastAddon] skipCastTime: {}, isContinuousCast: {}", skipCastTime, isContinuousCast);
+            LOGGER.info("[VoiceCastAddon] Will use: {}", (skipCastTime && !isContinuousCast) ? "castSpell (instant)" : "attemptInitiateCast (normal)");
+
             if (skipCastTime && !isContinuousCast) {
                 // Direct cast without cast time (only for non-continuous spells)
                 CastResult canCast = spell.canBeCastedBy(spellLevel, castSource, magicData, player);
@@ -285,17 +289,14 @@ public class ServerSpellCaster {
      */
     private static boolean isContinuousCastSpell(io.redspace.ironsspellbooks.api.spells.AbstractSpell spell) {
         try {
-            // Try to call getCastDuration() method via reflection
-            // Continuous cast spells have a cast duration > 0
-            Method getCastDuration = spell.getClass().getMethod("getCastDuration");
-            Object result = getCastDuration.invoke(spell);
-            if (result instanceof Integer duration) {
-                return duration > 0;
+            Method getCastType = spell.getClass().getMethod("getCastType");
+            Object castType = getCastType.invoke(spell);
+            if (castType != null && castType.toString().equals("CONTINUOUS")) {
+                LOGGER.debug("[VoiceCastAddon] Spell {} is CONTINUOUS cast type", spell.getSpellId());
+                return true;
             }
         } catch (Exception e) {
-            // Method doesn't exist or failed to invoke, assume it's not a continuous cast spell
-            LOGGER.debug("[VoiceCastAddon] Could not check getCastDuration for spell {}: {}",
-                spell.getSpellId(), e.getMessage());
+            LOGGER.debug("[VoiceCastAddon] Could not check getCastType for {}: {}", spell.getSpellId(), e.getMessage());
         }
         return false;
     }
