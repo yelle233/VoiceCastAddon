@@ -21,13 +21,13 @@ Voice Cast Addon is a Minecraft mod that adds voice-controlled spellcasting to *
 
 #### Step 1: Configure Audio Device
 
-1. Press `ESC` → **Mod Options** → **Voice Cast Addon**
+1. Press `ESC` → **Mod Options** → **Voice Cast Addon**, or use the keybinding to open the settings screen
 2. Select your microphone from the device list
 3. Click **Save**
 
 #### Step 2: Record Voice Templates
 
-1. Press `ESC` → **Mod Options** → **Voice Cast Addon**
+1. Press `ESC` → **Mod Options** → **Voice Cast Addon**, or use the keybinding to open the settings screen
 2. In the settings screen, click **Record Voice Templates**
 3. Select a spell from the list
 4. Click **Click to Record** button
@@ -122,13 +122,13 @@ This mod uses **template-based voice recognition** instead of traditional speech
 
 #### 第一步：配置音频设备
 
-1. 按 `ESC` → **模组选项** → **语音施法附属**
+1. 按 `ESC` → **模组选项** → **语音施法附属**，或通过绑定打开配置界面的按键来打开配置界面
 2. 从设备列表中选择你的麦克风
 3. 点击**保存**
 
 #### 第二步：录制语音模板
 
-1. 按 `ESC` → **模组选项** → **语音施法附属（VoiceCastAddon）**
+1. 按 `ESC` → **模组选项** → **语音施法附属（VoiceCastAddon）**，或通过绑定打开配置界面的按键来打开配置界面
 2. 在设置界面中，点击**录制语音模板**
 3. 从列表中选择一个法术
 4. 点击**点击录音**按钮
