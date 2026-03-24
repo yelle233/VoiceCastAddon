@@ -14,7 +14,6 @@ import io.redspace.ironsspellbooks.api.spells.SpellData;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
 import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.capabilities.magic.CooldownInstance;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,6 +28,12 @@ import java.util.function.Predicate;
 
 public class ServerSpellCaster {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final String CONTINUOUS_CAST_TYPE = "CONTINUOUS";
+    private static final String CURIOS_SPELLBOOK_SLOT = "spellbook";
+
+    // Curios API reflection cache
+    private static Class<?> curiosApiClass = null;
+    private static boolean curiosApiChecked = false;
 
     public static void castByVoice(ServerPlayer player, String spokenSpellIdString, boolean skipCastTime, boolean ignoreCooldown, boolean ignoreMana) {
         ResourceLocation spokenSpellId;
@@ -41,34 +46,17 @@ public class ServerSpellCaster {
         LOGGER.debug("[VoiceCastAddon] Attempting to cast spell: {}", spokenSpellId);
 
         ItemStack mainHand = player.getMainHandItem();
-        LOGGER.debug("[VoiceCastAddon] Main hand: {} (empty: {}, isSpellContainer: {})",
-            mainHand.getItem().getClass().getSimpleName(),
-            mainHand.isEmpty(),
-            !mainHand.isEmpty() && ISpellContainer.isSpellContainer(mainHand));
-
         if (tryCastFromStack(player, mainHand, spokenSpellId, SpellSelectionManager.MAINHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
-            LOGGER.debug("[VoiceCastAddon] Cast from main hand");
             return;
         }
 
         ItemStack offHand = player.getOffhandItem();
-        LOGGER.debug("[VoiceCastAddon] Off hand: {} (empty: {}, isSpellContainer: {})",
-            offHand.getItem().getClass().getSimpleName(),
-            offHand.isEmpty(),
-            !offHand.isEmpty() && ISpellContainer.isSpellContainer(offHand));
-
         if (tryCastFromStack(player, offHand, spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
-            LOGGER.debug("[VoiceCastAddon] Cast from off hand");
             return;
         }
 
         ItemStack equippedSpellbook = findEquippedSpellbook(player);
-        LOGGER.debug("[VoiceCastAddon] Equipped spellbook: {} (empty: {})",
-            equippedSpellbook.isEmpty() ? "none" : equippedSpellbook.getItem().getClass().getSimpleName(),
-            equippedSpellbook.isEmpty());
-
         if (!equippedSpellbook.isEmpty() && tryCastFromStack(player, equippedSpellbook, spokenSpellId, SpellSelectionManager.OFFHAND, skipCastTime, ignoreCooldown, ignoreMana)) {
-            LOGGER.debug("[VoiceCastAddon] Cast from equipped spellbook");
             return;
         }
 
@@ -87,42 +75,33 @@ public class ServerSpellCaster {
             return false;
         }
 
-        LOGGER.debug("[VoiceCastAddon] Checking stack: {}", stack.getItem().getClass().getSimpleName());
-
         ISpellContainer container = ISpellContainer.getOrCreate(stack);
         SpellSlot[] allSpells = container.getAllSpells();
-        LOGGER.debug("[VoiceCastAddon] Container has {} spell slots", allSpells.length);
 
         CastSource castSource = resolveCastSource(stack, container);
         boolean ignoreLockedStatus = castSource == CastSource.SCROLL || castSource == CastSource.SWORD;
 
         for (SpellSlot spellSlot : allSpells) {
             if (spellSlot == null) {
-                LOGGER.debug("[VoiceCastAddon] Skipping null slot");
                 continue;
             }
 
             // For scrolls and imbued weapons, ignore the locked status
             if (!ignoreLockedStatus && spellSlot.isLocked()) {
-                LOGGER.debug("[VoiceCastAddon] Skipping locked slot");
                 continue;
             }
 
             SpellData spellData = spellSlot.spellData();
             if (spellData == null || spellData.getSpell() == null) {
-                LOGGER.debug("[VoiceCastAddon] Skipping slot with null spell data");
                 continue;
             }
 
             ResourceLocation actualSpellId = SpellRegistry.REGISTRY.getKey(spellData.getSpell());
-            LOGGER.debug("[VoiceCastAddon] Found spell: {} (looking for: {}, isLocked: {})",
-                actualSpellId, spokenSpellId, spellSlot.isLocked());
-
             if (actualSpellId == null || !actualSpellId.equals(spokenSpellId)) {
                 continue;
             }
 
-            LOGGER.debug("[VoiceCastAddon] Match found! Attempting to cast...");
+            LOGGER.debug("[VoiceCastAddon] Found matching spell: {}", actualSpellId);
             tryCastSpell(player, stack, spellData, castingSlot, castSource, skipCastTime, ignoreCooldown, ignoreMana);
             // Return true even if cast failed - we found the spell
             // Error messages are shown by tryCastSpell
@@ -168,9 +147,9 @@ public class ServerSpellCaster {
             // Continuous cast spells need the casting animation to work properly
             boolean isContinuousCast = isContinuousCastSpell(spell);
 
-            LOGGER.info("[VoiceCastAddon] === Cast decision for {} ===", spell.getSpellId());
-            LOGGER.info("[VoiceCastAddon] skipCastTime: {}, isContinuousCast: {}", skipCastTime, isContinuousCast);
-            LOGGER.info("[VoiceCastAddon] Will use: {}", (skipCastTime && !isContinuousCast) ? "castSpell (instant)" : "attemptInitiateCast (normal)");
+            LOGGER.debug("[VoiceCastAddon] Cast decision: spell={}, skipCastTime={}, isContinuousCast={}, method={}",
+                spell.getSpellId(), skipCastTime, isContinuousCast,
+                (skipCastTime && !isContinuousCast) ? "instant" : "normal");
 
             if (skipCastTime && !isContinuousCast) {
                 // Direct cast without cast time (only for non-continuous spells)
@@ -291,7 +270,7 @@ public class ServerSpellCaster {
         try {
             Method getCastType = spell.getClass().getMethod("getCastType");
             Object castType = getCastType.invoke(spell);
-            if (castType != null && castType.toString().equals("CONTINUOUS")) {
+            if (castType != null && CONTINUOUS_CAST_TYPE.equals(castType.toString())) {
                 LOGGER.debug("[VoiceCastAddon] Spell {} is CONTINUOUS cast type", spell.getSpellId());
                 return true;
             }
@@ -302,8 +281,22 @@ public class ServerSpellCaster {
     }
 
     private static ItemStack findEquippedSpellbook(ServerPlayer player) {
+        if (!curiosApiChecked) {
+            try {
+                curiosApiClass = Class.forName("top.theillusivec4.curios.api.CuriosApi");
+            } catch (ClassNotFoundException e) {
+                LOGGER.debug("[VoiceCastAddon] Curios API not found, spellbook slot detection disabled");
+            } catch (Exception e) {
+                LOGGER.error("[VoiceCastAddon] Unexpected error loading Curios API", e);
+            }
+            curiosApiChecked = true;
+        }
+
+        if (curiosApiClass == null) {
+            return ItemStack.EMPTY;
+        }
+
         try {
-            Class<?> curiosApiClass = Class.forName("top.theillusivec4.curios.api.CuriosApi");
             Method getCuriosInventory = curiosApiClass.getMethod("getCuriosInventory", net.minecraft.world.entity.LivingEntity.class);
             Object curiosInventoryOptional = getCuriosInventory.invoke(null, player);
             if (!(curiosInventoryOptional instanceof Optional<?> optionalInventory) || optionalInventory.isEmpty()) {
@@ -313,7 +306,7 @@ public class ServerSpellCaster {
             Object inventory = optionalInventory.get();
             Method findFirstCurio = inventory.getClass().getMethod("findFirstCurio", Predicate.class, String.class);
             Predicate<ItemStack> spellbookPredicate = stack -> stack.getItem() instanceof ISpellbook;
-            Object slotResultOptional = findFirstCurio.invoke(inventory, spellbookPredicate, "spellbook");
+            Object slotResultOptional = findFirstCurio.invoke(inventory, spellbookPredicate, CURIOS_SPELLBOOK_SLOT);
             if (!(slotResultOptional instanceof Optional<?> optionalSlotResult) || optionalSlotResult.isEmpty()) {
                 return ItemStack.EMPTY;
             }
@@ -322,7 +315,8 @@ public class ServerSpellCaster {
             Method stackMethod = slotResult.getClass().getMethod("stack");
             Object stack = stackMethod.invoke(slotResult);
             return stack instanceof ItemStack itemStack ? itemStack : ItemStack.EMPTY;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            LOGGER.debug("[VoiceCastAddon] Could not access Curios inventory: {}", e.getMessage());
             return ItemStack.EMPTY;
         }
     }
