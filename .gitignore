@@ -39,3 +39,4 @@ run/
 repo/
 !**/src/**/repo/
 /.claude/
+/PROJECT_MEMORY.md

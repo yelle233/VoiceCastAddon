@@ -16,7 +16,7 @@ Voice Cast Addon is a Minecraft mod that adds voice-controlled spellcasting to *
 - **Minecraft**: 1.20.1
 - **Mod Loader**: Forge 47.4.0+ (also works on NeoForge 1.20.1)
 - **Java**: 17
-- **Dependencies**: Iron's Spells 'n Spellbooks (1.20.1-3.4.0.2), Curios
+- **Dependencies**: Iron's Spells 'n Spellbooks (1.20.1-3.4.0.11 through 1.20.1-3.16.2), Curios
 
 
 ### How to Use
@@ -118,7 +118,7 @@ This mod uses **template-based voice recognition** instead of traditional speech
 - **Minecraft**: 1.20.1
 - **模组加载器**: Forge 47.4.0+（1.20.1 的 NeoForge 同样可用）
 - **Java**: 17
-- **前置模组**: Iron's Spells 'n Spellbooks（1.20.1-3.4.0.2）、Curios
+- **前置模组**: Iron's Spells 'n Spellbooks（兼容 1.20.1-3.4.0.11 至 1.20.1-3.16.2）、Curios
 
 
 ### 使用教程
@@ -204,5 +204,4 @@ This mod uses **template-based voice recognition** instead of traditional speech
 - **响应时间**：50-150ms（纯 Java 实现，无外部依赖）
 - **匹配阈值**：50.0（可在 `client_settings.json` 中配置）
 - **推荐样本数**：每个触发词10个（超过此数量收益递减）
-
 

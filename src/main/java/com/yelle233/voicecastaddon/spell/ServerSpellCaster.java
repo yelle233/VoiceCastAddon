@@ -1,10 +1,12 @@
 package com.yelle233.voicecastaddon.spell;
 
 import com.mojang.logging.LogUtils;
+import com.yelle233.voicecastaddon.compat.IsbApiCompat;
 import com.yelle233.voicecastaddon.compat.IsbSpells;
 import io.redspace.ironsspellbooks.api.item.IScroll;
 import io.redspace.ironsspellbooks.api.item.ISpellbook;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
+import io.redspace.ironsspellbooks.api.magic.MagicHelper;
 import io.redspace.ironsspellbooks.api.magic.SpellSelectionManager;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
@@ -12,11 +14,7 @@ import io.redspace.ironsspellbooks.api.spells.CastSource;
 import io.redspace.ironsspellbooks.api.spells.CastResult;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
-import io.redspace.ironsspellbooks.api.spells.SpellSlot;
-import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.capabilities.magic.CooldownInstance;
-import io.redspace.ironsspellbooks.network.SyncManaPacket;
-import io.redspace.ironsspellbooks.setup.PacketDistributor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,6 +24,7 @@ import net.minecraftforge.common.MinecraftForge;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -78,22 +77,17 @@ public class ServerSpellCaster {
 
         ISpellContainer container = ISpellContainer.getOrCreate(stack);
 
-        SpellSlot[] allSpells = container.getAllSpells();
+        List<SpellData> allSpells = IsbApiCompat.getAllSpellData(container);
 
         CastSource castSource = resolveCastSource(stack, container);
         boolean ignoreLockedStatus = castSource == CastSource.SCROLL || castSource == CastSource.SWORD;
 
-        for (SpellSlot spellSlot : allSpells) {
-            if (spellSlot == null) {
-                continue;
-            }
-
-            SpellData spellData = spellSlot.spellData();
+        for (SpellData spellData : allSpells) {
             if (spellData == null || spellData.getSpell() == null) {
                 continue;
             }
 
-            if (!ignoreLockedStatus && spellSlot.isLocked()) {
+            if (!ignoreLockedStatus && spellData.isLocked()) {
                 continue;
             }
 
@@ -182,10 +176,7 @@ public class ServerSpellCaster {
                 magicData.resetCastingState();
 
                 if (!ignoreCooldown) {
-                    int baseCooldown = spell.getSpellCooldown();
-                    int cooldownTicks = Utils.applyCooldownReduction(baseCooldown, player);
-                    magicData.getPlayerCooldowns().addCooldown(spell.getSpellId(), cooldownTicks, cooldownTicks);
-                    magicData.getPlayerCooldowns().syncToPlayer(player);
+                    MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, castSource);
                 }
 
                 restoreState(magicData, spell, savedCooldown, originalMana, ignoreManaCost, true, player);
@@ -242,7 +233,7 @@ public class ServerSpellCaster {
         }
 
         magicData.setMana(originalMana);
-        PacketDistributor.sendToPlayer(player, new SyncManaPacket(magicData));
+        IsbApiCompat.syncMana(magicData, player);
     }
 
     private static void showCastResultMessage(ServerPlayer player, CastResult castResult) {
@@ -270,13 +261,13 @@ public class ServerSpellCaster {
     private static boolean hasOnlyLockedSpells(ISpellContainer container) {
         boolean sawSpell = false;
 
-        for (SpellSlot spellSlot : container.getAllSpells()) {
-            if (spellSlot == null || spellSlot.spellData() == null || spellSlot.spellData().getSpell() == null) {
+        for (SpellData spellData : IsbApiCompat.getAllSpellData(container)) {
+            if (spellData == null || spellData.getSpell() == null) {
                 continue;
             }
 
             sawSpell = true;
-            if (!spellSlot.isLocked()) {
+            if (!spellData.isLocked()) {
                 return false;
             }
         }
