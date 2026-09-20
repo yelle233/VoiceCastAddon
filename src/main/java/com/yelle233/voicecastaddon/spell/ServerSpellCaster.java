@@ -12,7 +12,6 @@ import io.redspace.ironsspellbooks.api.spells.CastResult;
 import io.redspace.ironsspellbooks.api.spells.ISpellContainer;
 import io.redspace.ironsspellbooks.api.spells.SpellData;
 import io.redspace.ironsspellbooks.api.spells.SpellSlot;
-import io.redspace.ironsspellbooks.api.util.Utils;
 import io.redspace.ironsspellbooks.capabilities.magic.CooldownInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -176,18 +175,12 @@ public class ServerSpellCaster {
                 magicData.initiateCast(spell, spellLevel, 0, castSource, castingSlot);
                 magicData.setPlayerCastingItem(stack);
 
-                spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreMana);
+                // Let Iron's Spells manage cooldowns so recast spells only enter
+                // cooldown after their final stage instead of after the first cast.
+                spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreCooldown);
 
                 // Reset casting state immediately after cast
                 magicData.resetCastingState();
-
-                // Apply cooldown if not ignoring it
-                if (!ignoreCooldown) {
-                    int baseCooldown = spell.getSpellCooldown();
-                    int cooldownTicks = Utils.applyCooldownReduction(baseCooldown, player);
-                    magicData.getPlayerCooldowns().addCooldown(spell.getSpellId(), cooldownTicks, cooldownTicks);
-                    magicData.getPlayerCooldowns().syncToPlayer(player);
-                }
 
                 restoreState(magicData, spell, savedCooldown, originalMana, ignoreMana, true, player);
                 return true;
