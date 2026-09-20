@@ -6,7 +6,6 @@ import com.yelle233.voicecastaddon.compat.IsbSpells;
 import io.redspace.ironsspellbooks.api.item.IScroll;
 import io.redspace.ironsspellbooks.api.item.ISpellbook;
 import io.redspace.ironsspellbooks.api.magic.MagicData;
-import io.redspace.ironsspellbooks.api.magic.MagicHelper;
 import io.redspace.ironsspellbooks.api.magic.SpellSelectionManager;
 import io.redspace.ironsspellbooks.api.events.SpellPreCastEvent;
 import io.redspace.ironsspellbooks.api.spells.AbstractSpell;
@@ -171,13 +170,11 @@ public class ServerSpellCaster {
                     VoiceCastManaEvents.begin(player, spell.getSpellId(), castSource, player.level().getGameTime() + 20L);
                 }
 
-                spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreMana);
+                // Let Iron's Spells manage cooldowns so recast spells only enter
+                // cooldown after their final stage instead of after the first cast.
+                spell.castSpell(player.level(), spellLevel, player, castSource, !ignoreCooldown);
 
                 magicData.resetCastingState();
-
-                if (!ignoreCooldown) {
-                    MagicHelper.MAGIC_MANAGER.addCooldown(player, spell, castSource);
-                }
 
                 restoreState(magicData, spell, savedCooldown, originalMana, ignoreManaCost, true, player);
                 return true;
